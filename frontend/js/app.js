@@ -390,6 +390,10 @@ const showEmployeeModal = (emp = null) => {
     `;
     document.body.appendChild(modal);
 
+    // Focus on Full Name input immediately
+    const nameInput = document.getElementById('emp-name');
+    if (nameInput) nameInput.focus();
+
     // Auto-capitalize first letter of each word for Name, Department, and Designation
     const autoCapFields = ['emp-name', 'emp-dept', 'emp-desig'];
     autoCapFields.forEach(id => {
@@ -517,9 +521,11 @@ const renderAttendance = async (container) => {
     container.innerHTML = `
         <h1>Daily Attendance</h1>
         <div class="content-card">
-            <div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center;">
+            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
                 <label>Select Date:</label>
-                <input type="date" id="attendance-date" style="padding: 5px; border-radius: 5px;" value="${getLocalDateString()}" onchange="fetchTodayAttendance()">
+                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1)">&lt;</button>
+                <input type="date" id="attendance-date" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;" value="${getLocalDateString()}" onchange="fetchTodayAttendance()">
+                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1)">&gt;</button>
             </div>
             <table>
                 <thead>
@@ -535,6 +541,20 @@ const renderAttendance = async (container) => {
             </table>
         </div>
     `;
+    fetchTodayAttendance();
+};
+
+const changeAttendanceDate = (days) => {
+    const el = document.getElementById('attendance-date');
+    if (!el) return;
+    const parts = el.value.split('-');
+    if (parts.length !== 3) return;
+    const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    date.setDate(date.getDate() + days);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    el.value = `${y}-${m}-${d}`;
     fetchTodayAttendance();
 };
 
@@ -990,6 +1010,7 @@ window.closeModal = closeModal;
 window.updateSelectStyle = updateSelectStyle;
 window.getStatusSelectStyle = getStatusSelectStyle;
 window.getLocalDateString = getLocalDateString;
+window.changeAttendanceDate = changeAttendanceDate;
 
 // Handle Enter key navigation in all forms/cards (Auth, Employee Modal, etc.)
 document.addEventListener('keydown', (e) => {
