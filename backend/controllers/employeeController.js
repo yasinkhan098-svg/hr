@@ -31,10 +31,11 @@ exports.getEmployeeById = async (req, res) => {
 
 exports.addEmployee = async (req, res) => {
     const { full_name, email, phone = null, department = null, designation = null, basic_salary, joining_date } = req.body;
+    const emailVal = email && email.trim() !== '' ? email.trim() : null;
     try {
         const [result] = await db.execute(
             'INSERT INTO employees (organization_id, full_name, email, phone, department, designation, basic_salary, joining_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.organization_id, full_name, email, phone, department, designation, basic_salary, joining_date]
+            [req.user.organization_id, full_name, emailVal, phone, department, designation, basic_salary, joining_date]
         );
         res.status(201).json({ id: result.insertId, message: 'Employee added successfully' });
     } catch (error) {
@@ -48,12 +49,13 @@ exports.addEmployee = async (req, res) => {
 
 exports.updateEmployee = async (req, res) => {
     const { full_name, email, phone = null, department = null, designation = null, basic_salary, joining_date } = req.body;
+    const emailVal = email && email.trim() !== '' ? email.trim() : null;
     const orgId = req.user.organization_id;
     try {
         const [result] = await db.execute(
             `UPDATE employees SET full_name=?, email=?, phone=?, department=?, designation=?, basic_salary=?, joining_date=? 
              WHERE id=? AND ${orgId ? 'organization_id=?' : 'organization_id IS NULL'}`,
-            orgId ? [full_name, email, phone, department, designation, basic_salary, joining_date, req.params.id, orgId] : [full_name, email, phone, department, designation, basic_salary, joining_date, req.params.id]
+            orgId ? [full_name, emailVal, phone, department, designation, basic_salary, joining_date, req.params.id, orgId] : [full_name, emailVal, phone, department, designation, basic_salary, joining_date, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ message: 'Employee not found' });
         res.json({ message: 'Employee updated successfully' });

@@ -420,8 +420,8 @@ const saveEmployee = async () => {
         joining_date: document.getElementById('emp-joining').value
     };
 
-    if (!data.full_name || !data.email || !data.basic_salary) {
-        alert('Name, Email, and Basic Salary are required fields!');
+    if (!data.full_name || !data.basic_salary) {
+        alert('Name and Basic Salary are required fields!');
         return;
     }
 

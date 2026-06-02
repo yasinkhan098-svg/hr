@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS employees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     organization_id INTEGER,
     full_name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
+    email TEXT UNIQUE,
     phone TEXT,
     department TEXT,
     designation TEXT,
