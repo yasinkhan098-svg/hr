@@ -319,7 +319,7 @@ const renderEmployees = async (container) => {
             <h1 class="no-print">Employee Management</h1>
             <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - Employee List</h1>
             <div style="display: flex; gap: 0.5rem;" class="no-print">
-                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal()">Add Employee</button>
+                <button id="add-employee-btn" class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal()">Add Employee</button>
                 <button class="btn" style="width: auto; padding: 0.5rem 1.5rem; background: #6c757d;" onclick="window.print()">Print List</button>
             </div>
         </div>
@@ -439,7 +439,10 @@ const saveEmployee = async () => {
         const resData = await response.json();
         if (response.ok) {
             closeModal('employee-modal');
-            fetchEmployees();
+            await fetchEmployees();
+            // Focus back on the Add Employee button so hitting Enter reopens the modal
+            const addBtn = document.getElementById('add-employee-btn');
+            if (addBtn) addBtn.focus();
         } else {
             alert(`Error: ${resData.message || 'Failed to save employee'}`);
         }
