@@ -611,11 +611,12 @@ const renderAttendance = async (container, type = 'company_employee') => {
     container.innerHTML = `
         <h1>${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
         <div class="content-card">
-            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                 <label>Select Date:</label>
-                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1, '${type}')">&lt;</button>
+                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1, '${type}')">&#60;</button>
                 <input type="date" id="attendance-date" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;" value="${getLocalDateString()}" onchange="fetchTodayAttendance('${type}')">
-                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1, '${type}')">&gt;</button>
+                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1, '${type}')">&#62;</button>
+                <span id="sunday-banner" style="display:none; background:#c0392b; color:#fff; font-weight:bold; padding:4px 14px; border-radius:6px; font-size:0.9rem;">☀ Sunday — Holiday</span>
             </div>
             <table>
                 <thead>
@@ -642,27 +643,57 @@ const fetchTodayAttendance = async (type = 'company_employee') => {
     if (tbody) {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>`;
     }
+
+    // Detect if selected date is Sunday
+    const parts = date.split('-');
+    const isSun = parts.length === 3
+        ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay() === 0
+        : false;
+    // Sunday holiday only applies to company employees
+    const isSundayHoliday = isSun && type === 'company_employee';
+
+    // Show/hide the Sunday banner (only for company employees)
+    const banner = document.getElementById('sunday-banner');
+    if (banner) banner.style.display = isSundayHoliday ? 'inline-block' : 'none';
+
     const response = await fetch(`${API_BASE_URL}/attendance/today?date=${date}&employee_type=${type}`, {
         headers: { 'Authorization': `Bearer ${state.token}` }
     });
     const attendance = await response.json();
     if (tbody) {
+        const todayStr = getLocalDateString();
         tbody.innerHTML = attendance.map(att => {
-            const todayStr = getLocalDateString();
-            const parts = date.split('-');
-            const isSun = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay() === 0;
-            const defaultStatus = date <= todayStr ? ((isSun && type !== 'per_day_worker') ? 'Leave' : 'Absent') : '';
+            const defaultStatus = date <= todayStr ? (isSundayHoliday ? 'Leave' : 'Absent') : '';
             const statusVal = att.status || defaultStatus;
 
+            // Row background: rose tint on Sunday for company employees
+            const rowStyle = isSundayHoliday ? 'background:#fff0f0;' : '';
+
+            // Name cell: show Sun badge for company employees on Sunday
+            const nameBadge = isSundayHoliday
+                ? `<span style="display:inline-block; background:#c0392b; color:#fff; font-size:0.65rem; font-weight:bold; padding:1px 5px; border-radius:4px; margin-left:6px; vertical-align:middle;">☀ Sun</span>`
+                : '';
+
+            // For Sunday company employees: rename 'Leave' option to 'Sunday (Holiday)'
+            const leaveOptionLabel = isSundayHoliday ? '☀ Sunday (Holiday)' : 'Leave';
+            const leaveOptionStyle = isSundayHoliday
+                ? 'background-color: #ffb3b3; color: #7b0000; font-weight: bold;'
+                : 'background-color: #fff3cd; color: #856404;';
+
+            // Dropdown style — use rose tint when Sunday + Leave selected
+            const selectStyle = isSundayHoliday && (statusVal === 'Leave' || statusVal === '')
+                ? 'background-color: #ffb3b3; color: #7b0000; border-color: #c0392b; font-weight: bold;'
+                : getStatusSelectStyle(statusVal);
+
             return `
-            <tr>
-                <td>${att.full_name}</td>
+            <tr style="${rowStyle}">
+                <td>${att.full_name}${nameBadge}</td>
                 <td>
-                    <select id="status-${att.id}" onchange="markAttendance(${att.id}, this.value, document.getElementById('adv-${att.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${getStatusSelectStyle(statusVal)} transition: all 0.2s ease;">
+                    <select id="status-${att.id}" onchange="markAttendance(${att.id}, this.value, document.getElementById('adv-${att.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${selectStyle} transition: all 0.2s ease;">
                         <option value="" ${statusVal === '' ? 'selected' : ''} style="background-color: #fff; color: #333;">Not Marked</option>
                         <option value="Present" ${statusVal === 'Present' ? 'selected' : ''} style="background-color: #d4edda; color: #155724;">Present</option>
                         <option value="Absent" ${statusVal === 'Absent' ? 'selected' : ''} style="background-color: #f8d7da; color: #721c24;">Absent</option>
-                        <option value="Leave" ${statusVal === 'Leave' ? 'selected' : ''} style="background-color: #fff3cd; color: #856404;">Leave</option>
+                        <option value="Leave" ${statusVal === 'Leave' ? 'selected' : ''} style="${leaveOptionStyle}">${leaveOptionLabel}</option>
                         <option value="Half" ${statusVal === 'Half' ? 'selected' : ''} style="background-color: #cce5ff; color: #004085;">Half Day</option>
                     </select>
                 </td>
