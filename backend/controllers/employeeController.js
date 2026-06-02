@@ -39,6 +39,9 @@ exports.addEmployee = async (req, res) => {
         res.status(201).json({ id: result.insertId, message: 'Employee added successfully' });
     } catch (error) {
         console.error(error);
+        if (error.code === 'ER_DUP_ENTRY' || error.code === 'SQLITE_CONSTRAINT' || (error.message && error.message.includes('UNIQUE'))) {
+            return res.status(400).json({ message: 'An employee with this email address already exists!' });
+        }
         res.status(500).json({ message: 'Server error' });
     }
 };
@@ -56,6 +59,9 @@ exports.updateEmployee = async (req, res) => {
         res.json({ message: 'Employee updated successfully' });
     } catch (error) {
         console.error(error);
+        if (error.code === 'ER_DUP_ENTRY' || error.code === 'SQLITE_CONSTRAINT' || (error.message && error.message.includes('UNIQUE'))) {
+            return res.status(400).json({ message: 'An employee with this email address already exists!' });
+        }
         res.status(500).json({ message: 'Server error' });
     }
 };

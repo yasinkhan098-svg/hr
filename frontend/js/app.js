@@ -420,17 +420,31 @@ const saveEmployee = async () => {
         joining_date: document.getElementById('emp-joining').value
     };
 
+    if (!data.full_name || !data.email || !data.basic_salary) {
+        alert('Name, Email, and Basic Salary are required fields!');
+        return;
+    }
+
     const method = id ? 'PUT' : 'POST';
     const url = id ? `${API_BASE_URL}/employees/${id}` : `${API_BASE_URL}/employees`;
 
-    await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
-        body: JSON.stringify(data)
-    });
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.token}` },
+            body: JSON.stringify(data)
+        });
 
-    closeModal('employee-modal');
-    fetchEmployees();
+        const resData = await response.json();
+        if (response.ok) {
+            closeModal('employee-modal');
+            fetchEmployees();
+        } else {
+            alert(`Error: ${resData.message || 'Failed to save employee'}`);
+        }
+    } catch (error) {
+        alert('Server communication error. Make sure backend is running.');
+    }
 };
 
 const deleteEmployee = async (id) => {
