@@ -956,4 +956,27 @@ window.updateSelectStyle = updateSelectStyle;
 window.getStatusSelectStyle = getStatusSelectStyle;
 window.getLocalDateString = getLocalDateString;
 
+// Handle Enter key navigation in Auth Forms
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const active = document.activeElement;
+        if (active && active.tagName === 'INPUT' && active.closest('.auth-container')) {
+            e.preventDefault();
+            const card = active.closest('.login-card') || active.closest('.register-card');
+            if (card) {
+                const inputs = Array.from(card.querySelectorAll('input'));
+                const currentIndex = inputs.indexOf(active);
+                if (currentIndex !== -1) {
+                    if (currentIndex < inputs.length - 1) {
+                        inputs[currentIndex + 1].focus();
+                    } else {
+                        const btn = card.querySelector('.btn:not(.btn-secondary)');
+                        if (btn) btn.click();
+                    }
+                }
+            }
+        }
+    }
+});
+
 init();
