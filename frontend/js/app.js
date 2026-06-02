@@ -389,6 +389,23 @@ const showEmployeeModal = (emp = null) => {
         </div>
     `;
     document.body.appendChild(modal);
+
+    // Auto-capitalize first letter of each word for Name, Department, and Designation
+    const autoCapFields = ['emp-name', 'emp-dept', 'emp-desig'];
+    autoCapFields.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', (e) => {
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                const capitalized = e.target.value.replace(/\b\w/g, char => char.toUpperCase());
+                if (e.target.value !== capitalized) {
+                    e.target.value = capitalized;
+                    e.target.setSelectionRange(start, end);
+                }
+            });
+        }
+    });
 };
 
 const saveEmployee = async () => {
