@@ -674,31 +674,34 @@ const fetchTodayAttendance = async (type = 'company_employee') => {
                 ? `<span style="display:inline-block; background:#c0392b; color:#fff; font-size:0.65rem; font-weight:bold; padding:1px 5px; border-radius:4px; margin-left:6px; vertical-align:middle;">☀ Sun</span>`
                 : '';
 
-            // For Sunday company employees: rename 'Leave' option to 'Sunday (Holiday)'
-            const leaveOptionLabel = isSundayHoliday ? '☀ Sunday (Holiday)' : 'Leave';
-            const leaveOptionStyle = isSundayHoliday
-                ? 'background-color: #ffb3b3; color: #7b0000; font-weight: bold;'
-                : 'background-color: #fff3cd; color: #856404;';
-
-            // Dropdown style — use rose tint when Sunday + Leave selected
-            const selectStyle = isSundayHoliday && (statusVal === 'Leave' || statusVal === '')
-                ? 'background-color: #ffb3b3; color: #7b0000; border-color: #c0392b; font-weight: bold;'
-                : getStatusSelectStyle(statusVal);
+            // Sunday: show static pill label — no dropdown, no interaction needed
+            const statusCell = isSundayHoliday
+                ? `<span style="
+                      display: inline-block;
+                      background: linear-gradient(135deg, #c0392b, #e74c3c);
+                      color: #fff;
+                      font-weight: bold;
+                      font-size: 0.85rem;
+                      padding: 6px 16px;
+                      border-radius: 20px;
+                      letter-spacing: 0.03em;
+                      box-shadow: 0 2px 6px rgba(192,57,43,0.3);
+                      user-select: none;
+                   ">☀ Sunday (Holiday)</span>`
+                : `<select id="status-${att.id}" onchange="markAttendance(${att.id}, this.value, document.getElementById('adv-${att.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${getStatusSelectStyle(statusVal)} transition: all 0.2s ease;">
+                        <option value="" ${statusVal === '' ? 'selected' : ''} style="background-color: #fff; color: #333;">Not Marked</option>
+                        <option value="Present" ${statusVal === 'Present' ? 'selected' : ''} style="background-color: #d4edda; color: #155724;">Present</option>
+                        <option value="Absent" ${statusVal === 'Absent' ? 'selected' : ''} style="background-color: #f8d7da; color: #721c24;">Absent</option>
+                        <option value="Leave" ${statusVal === 'Leave' ? 'selected' : ''} style="background-color: #fff3cd; color: #856404;">Leave</option>
+                        <option value="Half" ${statusVal === 'Half' ? 'selected' : ''} style="background-color: #cce5ff; color: #004085;">Half Day</option>
+                   </select>`;
 
             return `
             <tr style="${rowStyle}">
                 <td>${att.full_name}${nameBadge}</td>
+                <td>${statusCell}</td>
                 <td>
-                    <select id="status-${att.id}" onchange="markAttendance(${att.id}, this.value, document.getElementById('adv-${att.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${selectStyle} transition: all 0.2s ease;">
-                        <option value="" ${statusVal === '' ? 'selected' : ''} style="background-color: #fff; color: #333;">Not Marked</option>
-                        <option value="Present" ${statusVal === 'Present' ? 'selected' : ''} style="background-color: #d4edda; color: #155724;">Present</option>
-                        <option value="Absent" ${statusVal === 'Absent' ? 'selected' : ''} style="background-color: #f8d7da; color: #721c24;">Absent</option>
-                        <option value="Leave" ${statusVal === 'Leave' ? 'selected' : ''} style="${leaveOptionStyle}">${leaveOptionLabel}</option>
-                        <option value="Half" ${statusVal === 'Half' ? 'selected' : ''} style="background-color: #cce5ff; color: #004085;">Half Day</option>
-                    </select>
-                </td>
-                <td>
-                    <input type="number" id="adv-${att.id}" value="${parseFloat(att.advance_amount || 0)}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;" onchange="markAttendance(${att.id}, document.getElementById('status-${att.id}').value, this.value)" onkeydown="if(event.key === 'Enter') this.blur();">
+                    <input type="number" id="adv-${att.id}" value="${parseFloat(att.advance_amount || 0)}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;" onchange="markAttendance(${att.id}, 'Leave', this.value)" onkeydown="if(event.key === 'Enter') this.blur();">
                 </td>
             </tr>
         `;
