@@ -669,10 +669,8 @@ const fetchTodayAttendance = async (type = 'company_employee') => {
             // Row background: rose tint on Sunday for company employees
             const rowStyle = isSundayHoliday ? 'background:#fff0f0;' : '';
 
-            // Name cell: show Sun badge for company employees on Sunday
-            const nameBadge = isSundayHoliday
-                ? `<span style="display:inline-block; background:#c0392b; color:#fff; font-size:0.65rem; font-weight:bold; padding:1px 5px; border-radius:4px; margin-left:6px; vertical-align:middle;">☀ Sun</span>`
-                : '';
+            // No badge next to name — plain name only
+            const nameBadge = '';
 
             // Sunday: show static pill label — no dropdown, no interaction needed
             const statusCell = isSundayHoliday
