@@ -978,6 +978,15 @@ const renderDetailedAttendanceReport = async (month, year, type = 'company_emplo
     const data = await response.json();
 
     const contentArea = document.getElementById('main-content-area');
+
+    // Pre-compute which days are Sundays
+    const sundays = new Set();
+    for (let d = 1; d <= data.daysInMonth; d++) {
+        if (new Date(parseInt(y), parseInt(m) - 1, d).getDay() === 0) {
+            sundays.add(d);
+        }
+    }
+
     contentArea.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; gap: 1rem;">
@@ -996,45 +1005,126 @@ const renderDetailedAttendanceReport = async (month, year, type = 'company_emplo
                 <button class="btn" style="width: auto; background: #6c757d;" onclick="window.print()">Print Report</button>
             </div>
         </div>
+
         <div class="content-card" style="overflow-x: auto;">
             <table class="report-table" style="font-size: 0.8rem;">
                 <thead>
                     <tr>
-                        <th style="position: sticky; left: 0; background: #fff;">${isWorker ? 'Worker' : 'Employee'}</th>
-                        ${Array.from({ length: data.daysInMonth }, (_, i) => `<th>${i + 1}</th>`).join('')}
+                        <th style="position: sticky; left: 0; background: #f8f9fa; z-index: 2; white-space: nowrap; padding: 6px 8px;">${isWorker ? 'Worker' : 'Employee'}</th>
+                        ${Array.from({ length: data.daysInMonth }, (_, i) => {
+                            const day = i + 1;
+                            const isSun = sundays.has(day);
+                            if (isSun && !isWorker) {
+                                return `<th style="background: #c0392b; color: #fff; font-weight: bold; padding: 4px 2px; text-align:center; border-left: 2px solid #96281b; border-right: 2px solid #96281b;">
+                                    ${day}<br><span style="font-size:0.65rem;">रवि</span>
+                                </th>`;
+                            } else if (isSun && isWorker) {
+                                return `<th style="background: #e67e22; color: #fff; font-weight: bold; padding: 4px 2px; text-align:center;">
+                                    ${day}<br><span style="font-size:0.65rem;">☀</span>
+                                </th>`;
+                            }
+                            return `<th style="padding: 4px 2px; text-align:center;">${day}</th>`;
+                        }).join('')}
+                        ${!isWorker
+                            ? `<th style="background:#1b5e20; color:#fff; min-width:50px; padding:4px;">P</th>
+                               <th style="background:#b71c1c; color:#fff; min-width:50px; padding:4px;">A</th>
+                               <th style="background:#e65100; color:#fff; min-width:50px; padding:4px;">L</th>
+                               <th style="background:#0d47a1; color:#fff; min-width:50px; padding:4px;">H</th>
+                               <th style="background:#c0392b; color:#fff; min-width:55px; padding:4px;" title="Sunday Holidays">☀️Sun</th>`
+                            : `<th style="background:#1b5e20; color:#fff; min-width:50px; padding:4px;">P</th>
+                               <th style="background:#b71c1c; color:#fff; min-width:50px; padding:4px;">A</th>
+                               <th style="background:#e65100; color:#fff; min-width:50px; padding:4px;">L</th>
+                               <th style="background:#0d47a1; color:#fff; min-width:50px; padding:4px;">H</th>`
+                        }
                     </tr>
                 </thead>
                 <tbody>
-                    ${data.report.map(emp => `
-                        <tr>
-                            <td style="position: sticky; left: 0; background: #fff; font-weight: bold; white-space: nowrap;">${emp.full_name}</td>
-                            ${Array.from({ length: data.daysInMonth }, (_, i) => {
-                                const day = i + 1;
-                                const status = emp.days[day];
-                                const advance = emp.advances[day];
-                                let color = '#fff';
-                                if (status === 'Present') color = '#d4edda';
-                                if (status === 'Absent') color = '#f8d7da';
-                                if (status === 'Leave') color = '#fff3cd';
-                                if (status === 'Half') color = '#cce5ff';
+                    ${data.report.map(emp => {
+                        let presentCount = 0, absentCount = 0, leaveCount = 0, halfCount = 0, sundayHolidayCount = 0;
 
-                                return `
-                                    <td style="background: ${color}; text-align: center; width: 40px; padding: 4px; vertical-align: middle;">
-                                        <div style="font-weight: bold;">${status ? status[0] : '-'}</div>
-                                        ${advance > 0 ? `<div style="font-size: 0.6rem; color: #666;">${state.currency}${parseFloat(advance)}</div>` : ''}
-                                    </td>`;
-                            }).join('')}
-                        </tr>
-                    `).join('')}
+                        const cells = Array.from({ length: data.daysInMonth }, (_, i) => {
+                            const day = i + 1;
+                            const status = emp.days[day];
+                            const advance = emp.advances[day];
+                            const isSun = sundays.has(day);
+                            const isSunHoliday = isSun && !isWorker;
+
+                            // Tally counts
+                            if (status === 'Present') presentCount++;
+                            else if (status === 'Absent') absentCount++;
+                            else if (status === 'Leave') {
+                                leaveCount++;
+                                if (isSunHoliday) sundayHolidayCount++;
+                            }
+                            else if (status === 'Half') halfCount++;
+
+                            // Cell background + text colors
+                            let bg = '#ffffff';
+                            let fg = '#333';
+                            let fw = 'normal';
+                            let borderStyle = '';
+                            let displayChar = status ? status[0] : '-';
+
+                            if (isSunHoliday) {
+                                // Sunday holiday base styling (before status)
+                                bg = '#ffe5e5';
+                                fg = '#8b0000';
+                                fw = 'bold';
+                                borderStyle = 'border-left: 2px solid #c0392b; border-right: 2px solid #c0392b;';
+                                displayChar = status ? status[0] : '☀';
+                            }
+
+                            // Status overrides base color (but Sunday cells keep their border)
+                            if (status === 'Present') {
+                                bg = '#d4edda'; fg = '#155724'; fw = 'bold';
+                            } else if (status === 'Absent') {
+                                bg = '#f8d7da'; fg = '#721c24'; fw = 'bold';
+                            } else if (status === 'Leave') {
+                                if (isSunHoliday) {
+                                    // Sunday Leave = paid holiday — distinct warm rose color
+                                    bg = '#ffb3b3'; fg = '#7b0000'; fw = 'bold';
+                                } else {
+                                    bg = '#fff3cd'; fg = '#856404'; fw = 'bold';
+                                }
+                            } else if (status === 'Half') {
+                                bg = '#cce5ff'; fg = '#004085'; fw = 'bold';
+                            }
+
+                            return `<td style="background:${bg}; color:${fg}; font-weight:${fw}; text-align:center; width:40px; padding:4px; vertical-align:middle; ${borderStyle}">
+                                <div>${displayChar}</div>
+                                ${advance > 0 ? `<div style="font-size:0.6rem; color:#666;">${state.currency}${parseFloat(advance)}</div>` : ''}
+                            </td>`;
+                        }).join('');
+
+                        const statCells = !isWorker
+                            ? `<td style="background:#e8f5e9; color:#1b5e20; text-align:center; font-weight:bold;">${presentCount}</td>
+                               <td style="background:#fce4ec; color:#880e4f; text-align:center; font-weight:bold;">${absentCount}</td>
+                               <td style="background:#fff8e1; color:#e65100; text-align:center; font-weight:bold;">${leaveCount - sundayHolidayCount}</td>
+                               <td style="background:#e3f2fd; color:#0d47a1; text-align:center; font-weight:bold;">${halfCount}</td>
+                               <td style="background:#ffe5e5; color:#c0392b; text-align:center; font-weight:bold;">${sundayHolidayCount}</td>`
+                            : `<td style="background:#e8f5e9; color:#1b5e20; text-align:center; font-weight:bold;">${presentCount}</td>
+                               <td style="background:#fce4ec; color:#880e4f; text-align:center; font-weight:bold;">${absentCount}</td>
+                               <td style="background:#fff8e1; color:#e65100; text-align:center; font-weight:bold;">${leaveCount}</td>
+                               <td style="background:#e3f2fd; color:#0d47a1; text-align:center; font-weight:bold;">${halfCount}</td>`;
+
+                        return `<tr>
+                            <td style="position:sticky; left:0; background:#fff; font-weight:bold; white-space:nowrap; z-index:1; padding:4px 8px;">${emp.full_name}</td>
+                            ${cells}
+                            ${statCells}
+                        </tr>`;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
-        <div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1.5rem; background: #f8f9fa; padding: 1rem; border-radius: 5px;">
-             <span><b style="color: #28a745;">P</b>: Present</span>
-             <span><b style="color: #dc3545;">A</b>: Absent</span>
-             <span><b style="color: #ffc107;">L</b>: Leave</span>
-             <span><b style="color: #007bff;">H</b>: Half Day</span>
-             <span style="margin-left: auto;"><b>Total Monthly Advances:</b> ${state.currency}${data.report.reduce((sum, emp) => sum + Object.values(emp.advances).reduce((s, a) => s + parseFloat(a || 0), 0), 0).toFixed(2)}</span>
+
+        <div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; background: #f8f9fa; padding: 1rem; border-radius: 8px; align-items: center; border: 1px solid #e9ecef;">
+            <b style="font-size:0.85rem; color:#555;">Legend:</b>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#d4edda;border:1px solid #c3e6cb;border-radius:3px;display:inline-block;"></span><b style="color:#155724;">P</b> = Present</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#f8d7da;border:1px solid #f5c6cb;border-radius:3px;display:inline-block;"></span><b style="color:#721c24;">A</b> = Absent</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#fff3cd;border:1px solid #ffeeba;border-radius:3px;display:inline-block;"></span><b style="color:#856404;">L</b> = Leave</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#cce5ff;border:1px solid #b8daff;border-radius:3px;display:inline-block;"></span><b style="color:#004085;">H</b> = Half Day</span>
+            ${!isWorker ? `<span style="display:inline-flex; align-items:center; gap:4px; background:#ffe5e5; padding:3px 8px; border-radius:5px; border:1px solid #c0392b;"><span style="width:14px;height:14px;background:#ffb3b3;border:1px solid #c0392b;border-radius:3px;display:inline-block;"></span><b style="color:#7b0000;">☀️ रवि (Sunday)</b> = Paid Holiday</span>` : ''}
+            <span style="margin-left: auto; font-weight:bold; color:#555;"><b>Total Monthly Advances:</b> ${state.currency}${data.report.reduce((sum, emp) => sum + Object.values(emp.advances).reduce((s, a) => s + parseFloat(a || 0), 0), 0).toFixed(2)}</span>
         </div>
     `;
 };
