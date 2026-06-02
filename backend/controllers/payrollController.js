@@ -23,7 +23,7 @@ exports.calculatePayroll = async (req, res) => {
 
         // Get Attendance Data: count absences and sum advances
         const [attnRows] = await db.execute(
-            `SELECT status, advance_amount FROM attendance 
+            `SELECT CAST(strftime('%d', date) AS INTEGER) as day, status, advance_amount FROM attendance 
              WHERE employee_id = ? 
                AND CAST(strftime('%m', date) AS INTEGER) = ? 
                AND CAST(strftime('%Y', date) AS INTEGER) = ? 
@@ -33,18 +33,40 @@ exports.calculatePayroll = async (req, res) => {
 
         console.log(`Calculating payroll for ${employee_id}, ${m}/${y}. Found ${attnRows.length} attendance rows.`);
 
+        // Map existing database records by day
+        const attendanceByDay = {};
+        attnRows.forEach(row => {
+            attendanceByDay[row.day] = {
+                status: row.status,
+                advance_amount: parseFloat(row.advance_amount || 0)
+            };
+        });
+
+        // Get local today string in YYYY-MM-DD format (timezone safe)
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
         let absentDays = 0;
         let totalAdvances = 0;
 
-        attnRows.forEach(row => {
-            if (row.status === 'Absent') {
-                absentDays++;
-            } else if (row.status === 'Half') {
-                absentDays += 0.5;
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const record = attendanceByDay[day];
+
+            if (record) {
+                if (record.status === 'Absent') {
+                    absentDays++;
+                } else if (record.status === 'Half') {
+                    absentDays += 0.5;
+                }
+                totalAdvances += record.advance_amount;
+            } else {
+                // If there's no record in the DB and this date is today or in the past, it counts as Absent
+                if (dateStr <= todayStr) {
+                    absentDays++;
+                }
             }
-            const adv = parseFloat(row.advance_amount || 0);
-            totalAdvances += adv;
-        });
+        }
 
         console.log(`Absent days: ${absentDays}, Total Advances calculated: ${totalAdvances}`);
 

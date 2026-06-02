@@ -42,13 +42,31 @@ exports.getAttendanceReport = async (req, res) => {
 
         const daysInMonth = new Date(year, month, 0).getDate();
 
+        // Get local today string
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
         const report = employees.map(emp => {
             const empAttendance = {};
             const empAdvances = {};
+            
+            // Map existing database records
             attendance.filter(a => a.employee_id === emp.id).forEach(a => {
                 empAttendance[a.day] = a.status;
                 empAdvances[a.day] = a.advance_amount;
             });
+
+            // Auto-mark missing past dates as Absent
+            for (let day = 1; day <= daysInMonth; day++) {
+                if (empAttendance[day] === undefined) {
+                    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    if (formattedDate <= todayStr) {
+                        empAttendance[day] = 'Absent';
+                        empAdvances[day] = 0;
+                    }
+                }
+            }
+
             return {
                 id: emp.id,
                 full_name: emp.full_name,
@@ -125,14 +143,54 @@ exports.generateAttendanceReportPDF = async (req, res) => {
     const { month, year } = req.query;
     const orgId = req.user.organization_id;
     try {
-        const [rows] = await db.execute(
-            `SELECT a.date, a.status, e.full_name, e.department 
-             FROM attendance a 
-             JOIN employees e ON a.employee_id = e.id 
-             WHERE CAST(strftime('%m', a.date) AS INTEGER) = ? AND CAST(strftime('%Y', a.date) AS INTEGER) = ? AND ${orgId ? 'a.organization_id = ?' : 'a.organization_id IS NULL'}
-             ORDER BY a.date ASC, e.full_name ASC`,
+        const [employees] = await db.execute(
+            orgId ? 'SELECT id, full_name, department FROM employees WHERE organization_id = ?' : 'SELECT id, full_name, department FROM employees WHERE organization_id IS NULL',
+            orgId ? [orgId] : []
+        );
+
+        const [attendance] = await db.execute(
+            `SELECT date, status, employee_id
+             FROM attendance 
+             WHERE CAST(strftime('%m', date) AS INTEGER) = ? AND CAST(strftime('%Y', date) AS INTEGER) = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
             orgId ? [month, year, orgId] : [month, year]
         );
+
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const attendanceMap = {};
+        attendance.forEach(a => {
+            let dateStr = '';
+            if (a.date instanceof Date) {
+                dateStr = a.date.toISOString().split('T')[0];
+            } else {
+                dateStr = String(a.date).split(' ')[0];
+            }
+            attendanceMap[`${a.employee_id}_${dateStr}`] = a.status;
+        });
+
+        const reportRows = [];
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            for (const emp of employees) {
+                let status = attendanceMap[`${emp.id}_${dateStr}`];
+                if (status === undefined) {
+                    if (dateStr <= todayStr) {
+                        status = 'Absent';
+                    } else {
+                        status = 'Not Marked';
+                    }
+                }
+                reportRows.push({
+                    dateStr,
+                    full_name: emp.full_name,
+                    status
+                });
+            }
+        }
+
+        reportRows.sort((a, b) => a.dateStr.localeCompare(b.dateStr) || a.full_name.localeCompare(b.full_name));
 
         const doc = new PDFDocument();
         let filename = `attendance_report_${month}_${year}.pdf`;
@@ -143,16 +201,8 @@ exports.generateAttendanceReportPDF = async (req, res) => {
         doc.fontSize(20).text(`Attendance Report - ${month}/${year}`, { align: 'center' });
         doc.moveDown();
 
-        rows.forEach(row => {
-            let dateStr = '';
-            if (row.date) {
-                if (row.date instanceof Date) {
-                    dateStr = row.date.toISOString().split('T')[0];
-                } else {
-                    dateStr = String(row.date).split(' ')[0];
-                }
-            }
-            doc.fontSize(10).text(`${dateStr} | ${row.full_name.padEnd(20)} | ${row.status}`);
+        reportRows.forEach(row => {
+            doc.fontSize(10).text(`${row.dateStr} | ${row.full_name.padEnd(20)} | ${row.status}`);
         });
 
         doc.pipe(res);

@@ -577,11 +577,14 @@ const fetchTodayAttendance = async () => {
     const dateInput = document.getElementById('attendance-date');
     if (!dateInput) return;
     const date = dateInput.value;
+    const tbody = document.getElementById('attendance-table-body');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>`;
+    }
     const response = await fetch(`${API_BASE_URL}/attendance/today?date=${date}`, {
         headers: { 'Authorization': `Bearer ${state.token}` }
     });
     const attendance = await response.json();
-    const tbody = document.getElementById('attendance-table-body');
     if (tbody) {
         tbody.innerHTML = attendance.map(att => {
             const todayStr = getLocalDateString();
