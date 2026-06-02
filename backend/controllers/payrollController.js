@@ -26,8 +26,15 @@ exports.calculatePayroll = async (req, res) => {
             basic_salary = rate * daysInMonth;
             dailyRate = rate;
         } else {
+            // Count Sundays in this month (paid holidays — excluded from working days)
+            let sundaysInMonth = 0;
+            for (let d = 1; d <= daysInMonth; d++) {
+                if (new Date(y, m - 1, d).getDay() === 0) sundaysInMonth++;
+            }
+            const workingDays = daysInMonth - sundaysInMonth;
             basic_salary = rate;
-            dailyRate = basic_salary / daysInMonth;
+            // Daily rate based on working days only (Sundays are paid, not deductible)
+            dailyRate = basic_salary / workingDays;
         }
 
         // Get Attendance Data: count absences and sum advances

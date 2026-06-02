@@ -1016,7 +1016,7 @@ const renderDetailedAttendanceReport = async (month, year, type = 'company_emplo
                             const isSun = sundays.has(day);
                             if (isSun && !isWorker) {
                                 return `<th style="background: #c0392b; color: #fff; font-weight: bold; padding: 4px 2px; text-align:center; border-left: 2px solid #96281b; border-right: 2px solid #96281b;">
-                                    ${day}<br><span style="font-size:0.65rem;">रवि</span>
+                                    ${day}<br><span style="font-size:0.65rem;">Sun</span>
                                 </th>`;
                             } else if (isSun && isWorker) {
                                 return `<th style="background: #e67e22; color: #fff; font-weight: bold; padding: 4px 2px; text-align:center;">
@@ -1049,48 +1049,34 @@ const renderDetailedAttendanceReport = async (month, year, type = 'company_emplo
                             const isSun = sundays.has(day);
                             const isSunHoliday = isSun && !isWorker;
 
-                            // Tally counts
+                            if (isSunHoliday) {
+                                // Sunday: always show 'S', count in sundayHolidayCount only
+                                // Do NOT count in P / A / L / H totals
+                                sundayHolidayCount++;
+                                return `<td style="background:#ffb3b3; color:#7b0000; font-weight:bold; text-align:center; width:40px; padding:4px; vertical-align:middle; border-left:2px solid #c0392b; border-right:2px solid #c0392b;">
+                                    <div>S</div>
+                                    ${advance > 0 ? `<div style="font-size:0.6rem; color:#666;">${state.currency}${parseFloat(advance)}</div>` : ''}
+                                </td>`;
+                            }
+
+                            // Non-Sunday: tally counts normally
                             if (status === 'Present') presentCount++;
                             else if (status === 'Absent') absentCount++;
-                            else if (status === 'Leave') {
-                                leaveCount++;
-                                if (isSunHoliday) sundayHolidayCount++;
-                            }
+                            else if (status === 'Leave') leaveCount++;
                             else if (status === 'Half') halfCount++;
 
                             // Cell background + text colors
                             let bg = '#ffffff';
-                            let fg = '#333';
+                            let fg = '#555';
                             let fw = 'normal';
-                            let borderStyle = '';
                             let displayChar = status ? status[0] : '-';
 
-                            if (isSunHoliday) {
-                                // Sunday holiday base styling (before status)
-                                bg = '#ffe5e5';
-                                fg = '#8b0000';
-                                fw = 'bold';
-                                borderStyle = 'border-left: 2px solid #c0392b; border-right: 2px solid #c0392b;';
-                                displayChar = status ? status[0] : '☀';
-                            }
+                            if (status === 'Present') { bg = '#d4edda'; fg = '#155724'; fw = 'bold'; }
+                            else if (status === 'Absent') { bg = '#f8d7da'; fg = '#721c24'; fw = 'bold'; }
+                            else if (status === 'Leave') { bg = '#fff3cd'; fg = '#856404'; fw = 'bold'; }
+                            else if (status === 'Half') { bg = '#cce5ff'; fg = '#004085'; fw = 'bold'; }
 
-                            // Status overrides base color (but Sunday cells keep their border)
-                            if (status === 'Present') {
-                                bg = '#d4edda'; fg = '#155724'; fw = 'bold';
-                            } else if (status === 'Absent') {
-                                bg = '#f8d7da'; fg = '#721c24'; fw = 'bold';
-                            } else if (status === 'Leave') {
-                                if (isSunHoliday) {
-                                    // Sunday Leave = paid holiday — distinct warm rose color
-                                    bg = '#ffb3b3'; fg = '#7b0000'; fw = 'bold';
-                                } else {
-                                    bg = '#fff3cd'; fg = '#856404'; fw = 'bold';
-                                }
-                            } else if (status === 'Half') {
-                                bg = '#cce5ff'; fg = '#004085'; fw = 'bold';
-                            }
-
-                            return `<td style="background:${bg}; color:${fg}; font-weight:${fw}; text-align:center; width:40px; padding:4px; vertical-align:middle; ${borderStyle}">
+                            return `<td style="background:${bg}; color:${fg}; font-weight:${fw}; text-align:center; width:40px; padding:4px; vertical-align:middle;">
                                 <div>${displayChar}</div>
                                 ${advance > 0 ? `<div style="font-size:0.6rem; color:#666;">${state.currency}${parseFloat(advance)}</div>` : ''}
                             </td>`;
@@ -1123,7 +1109,7 @@ const renderDetailedAttendanceReport = async (month, year, type = 'company_emplo
             <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#f8d7da;border:1px solid #f5c6cb;border-radius:3px;display:inline-block;"></span><b style="color:#721c24;">A</b> = Absent</span>
             <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#fff3cd;border:1px solid #ffeeba;border-radius:3px;display:inline-block;"></span><b style="color:#856404;">L</b> = Leave</span>
             <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:14px;height:14px;background:#cce5ff;border:1px solid #b8daff;border-radius:3px;display:inline-block;"></span><b style="color:#004085;">H</b> = Half Day</span>
-            ${!isWorker ? `<span style="display:inline-flex; align-items:center; gap:4px; background:#ffe5e5; padding:3px 8px; border-radius:5px; border:1px solid #c0392b;"><span style="width:14px;height:14px;background:#ffb3b3;border:1px solid #c0392b;border-radius:3px;display:inline-block;"></span><b style="color:#7b0000;">☀️ रवि (Sunday)</b> = Paid Holiday</span>` : ''}
+            ${!isWorker ? `<span style="display:inline-flex; align-items:center; gap:4px; background:#ffe5e5; padding:3px 8px; border-radius:5px; border:1px solid #c0392b;"><span style="width:14px;height:14px;background:#ffb3b3;border:1px solid #c0392b;border-radius:3px;display:inline-block;"></span><b style="color:#7b0000;">S = Sunday</b> (Paid Holiday — not counted in P/A)</span>` : ''}
             <span style="margin-left: auto; font-weight:bold; color:#555;"><b>Total Monthly Advances:</b> ${state.currency}${data.report.reduce((sum, emp) => sum + Object.values(emp.advances).reduce((s, a) => s + parseFloat(a || 0), 0), 0).toFixed(2)}</span>
         </div>
     `;
