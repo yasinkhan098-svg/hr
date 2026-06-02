@@ -410,9 +410,10 @@ const showEmployeeModal = (emp = null) => {
 
 const saveEmployee = async () => {
     const id = document.getElementById('emp-id').value;
+    const emailInput = document.getElementById('emp-email').value;
     const data = {
         full_name: document.getElementById('emp-name').value,
-        email: document.getElementById('emp-email').value,
+        email: emailInput && emailInput.trim() !== '' ? emailInput.trim() : null,
         phone: document.getElementById('emp-phone').value,
         department: document.getElementById('emp-dept').value,
         designation: document.getElementById('emp-desig').value,
