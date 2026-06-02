@@ -1,0 +1,13 @@
+{
+    "name": "attendance-payroll-root",
+    "version": "1.0.0",
+    "description": "Root management for Attendance and Payroll System",
+    "scripts": {
+        "install-backend": "cd backend && npm install",
+        "dev": "concurrently \"npm run dev --prefix backend\" \"npx http-server frontend -p 3000\"",
+        "start": "concurrently \"npm start --prefix backend\" \"npx http-server frontend -p 3000\""
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
