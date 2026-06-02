@@ -6,20 +6,29 @@ exports.calculatePayroll = async (req, res) => {
     const { employee_id, month, year, overtime_hours = 0, deductions = 0 } = req.body;
     const orgId = req.user.organization_id;
     try {
-        // Get Employee Basic Salary
+        // Get Employee Details
         const [empRows] = await db.execute(
-            `SELECT basic_salary FROM employees WHERE id = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
+            `SELECT basic_salary, employee_type FROM employees WHERE id = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
             orgId ? [employee_id, orgId] : [employee_id]
         );
         if (empRows.length === 0) return res.status(404).json({ message: 'Employee not found' });
-        const basic_salary = parseFloat(empRows[0].basic_salary);
+        const rate = parseFloat(empRows[0].basic_salary);
+        const employeeType = empRows[0].employee_type || 'company_employee';
 
         const m = parseInt(month);
         const y = parseInt(year);
 
         // Calculate Days in the specific Month/Year
         const daysInMonth = new Date(year, month, 0).getDate();
-        const dailyRate = basic_salary / daysInMonth;
+        
+        let basic_salary, dailyRate;
+        if (employeeType === 'per_day_worker') {
+            basic_salary = rate * daysInMonth;
+            dailyRate = rate;
+        } else {
+            basic_salary = rate;
+            dailyRate = basic_salary / daysInMonth;
+        }
 
         // Get Attendance Data: count absences and sum advances
         const [attnRows] = await db.execute(
@@ -61,9 +70,14 @@ exports.calculatePayroll = async (req, res) => {
                 }
                 totalAdvances += record.advance_amount;
             } else {
-                // If there's no record in the DB and this date is today or in the past, it counts as Absent
+                // If there's no record in the DB and this date is today or in the past:
                 if (dateStr <= todayStr) {
-                    absentDays++;
+                    const isSun = new Date(y, m - 1, day).getDay() === 0;
+                    if (isSun && employeeType !== 'per_day_worker') {
+                        // Sunday is a paid holiday for company employees, do not count as absent
+                    } else {
+                        absentDays++;
+                    }
                 }
             }
         }

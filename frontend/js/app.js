@@ -240,6 +240,7 @@ const renderDashboardLayout = () => {
                 <ul class="nav-links">
                     <li data-view="dashboard" onclick="navigateTo('dashboard')"><a href="#"><span>Dashboard</span></a></li>
                     <li data-view="employees" onclick="navigateTo('employees')"><a href="#"><span>Employees</span></a></li>
+                    <li data-view="workers" onclick="navigateTo('workers')"><a href="#"><span>Per Day Workers</span></a></li>
                     <li data-view="attendance" onclick="navigateTo('attendance')"><a href="#"><span>Attendance</span></a></li>
                     <li data-view="payroll" onclick="navigateTo('payroll')"><a href="#"><span>Payroll</span></a></li>
                     <li data-view="reports" onclick="navigateTo('reports')"><a href="#"><span>Reports</span></a></li>
@@ -264,6 +265,9 @@ const renderView = async () => {
             break;
         case 'employees':
             renderEmployees(contentArea);
+            break;
+        case 'workers':
+            renderWorkers(contentArea);
             break;
         case 'attendance':
             renderAttendance(contentArea);
@@ -319,7 +323,7 @@ const renderEmployees = async (container) => {
             <h1 class="no-print">Employee Management</h1>
             <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - Employee List</h1>
             <div style="display: flex; gap: 0.5rem;" class="no-print">
-                <button id="add-employee-btn" class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal()">Add Employee</button>
+                <button id="add-employee-btn" class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal(null, 'company_employee')">Add Employee</button>
                 <button class="btn" style="width: auto; padding: 0.5rem 1.5rem; background: #6c757d;" onclick="window.print()">Print List</button>
             </div>
         </div>
@@ -341,46 +345,82 @@ const renderEmployees = async (container) => {
             </table>
         </div>
     `;
-    fetchEmployees();
+    fetchEmployees('company_employee');
 };
 
-const fetchEmployees = async () => {
+const renderWorkers = async (container) => {
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 class="no-print">Per Day Worker Management</h1>
+            <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - Per Day Worker List</h1>
+            <div style="display: flex; gap: 0.5rem;" class="no-print">
+                <button id="add-worker-btn" class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal(null, 'per_day_worker')">Add Per Day Worker</button>
+                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem; background: #6c757d;" onclick="window.print()">Print List</button>
+            </div>
+        </div>
+        <div class="content-card">
+            <table id="employee-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Department</th>
+                        <th>Per Day Amount</th>
+                        <th class="no-print">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="employee-table-body">
+                    <tr><td colspan="5" style="text-align:center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    fetchEmployees('per_day_worker');
+};
+
+const fetchEmployees = async (type = 'company_employee') => {
     const response = await fetch(`${API_BASE_URL}/employees`, {
         headers: { 'Authorization': `Bearer ${state.token}` }
     });
-    const employees = await response.json();
+    const allEmployees = await response.json();
+    const employees = allEmployees.filter(emp => (emp.employee_type || 'company_employee') === type);
     const tbody = document.getElementById('employee-table-body');
     if (tbody) {
         tbody.innerHTML = employees.map(emp => `
             <tr>
                 <td>${emp.full_name}</td>
-                <td>${emp.email}</td>
+                <td>${emp.email || '-'}</td>
                 <td>${emp.phone || '-'}</td>
                 <td>${emp.department || '-'}</td>
-                <td>${state.currency}${emp.basic_salary}</td>
+                <td>${state.currency}${emp.basic_salary}${type === 'per_day_worker' ? ' / Day' : ''}</td>
                 <td style="white-space: nowrap;" class="no-print">
                     <button class="btn" style="width: auto; padding: 2px 8px; font-size: 0.8rem;" onclick="showEmployeeModal(${JSON.stringify(emp).replace(/"/g, '&quot;')})">Edit</button>
-                    <button class="btn" style="width: auto; padding: 2px 8px; font-size: 0.8rem; background: var(--danger);" onclick="deleteEmployee(${emp.id})">Del</button>
+                    <button class="btn" style="width: auto; padding: 2px 8px; font-size: 0.8rem; background: var(--danger);" onclick="deleteEmployee(${emp.id}, '${type}')">Del</button>
                 </td>
             </tr>
         `).join('');
     }
 };
 
-const showEmployeeModal = (emp = null) => {
+const showEmployeeModal = (emp = null, defaultType = 'company_employee') => {
+    const type = emp ? (emp.employee_type || 'company_employee') : defaultType;
+    const isWorker = type === 'per_day_worker';
+
     const modal = document.createElement('div');
     modal.id = "employee-modal";
     modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;";
     modal.innerHTML = `
         <div class="content-card" style="width: 500px;">
-            <h2>${emp ? 'Edit' : 'Add'} Employee</h2>
+            <h2>${emp ? 'Edit' : 'Add'} ${isWorker ? 'Per Day Worker' : 'Employee'}</h2>
             <input type="hidden" id="emp-id" value="${emp ? emp.id : ''}">
+            <input type="hidden" id="emp-type" value="${type}">
             <div class="form-group"><label>Full Name</label><input type="text" id="emp-name" value="${emp ? emp.full_name : ''}"></div>
-            <div class="form-group"><label>Email</label><input type="email" id="emp-email" value="${emp ? emp.email : ''}"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="emp-email" value="${emp ? emp.email || '' : ''}"></div>
             <div class="form-group"><label>Phone</label><input type="text" id="emp-phone" value="${emp ? emp.phone || '' : ''}"></div>
             <div class="form-group"><label>Department</label><input type="text" id="emp-dept" value="${emp ? emp.department : ''}"></div>
             <div class="form-group"><label>Designation</label><input type="text" id="emp-desig" value="${emp ? emp.designation : ''}"></div>
-            <div class="form-group"><label>Basic Salary</label><input type="number" id="emp-salary" value="${emp ? emp.basic_salary : ''}"></div>
+            <div class="form-group"><label>${isWorker ? 'Per Day Amount' : 'Basic Salary'}</label><input type="number" id="emp-salary" value="${emp ? emp.basic_salary : ''}"></div>
             <div class="form-group"><label>Joining Date</label><input type="date" id="emp-joining" value="${emp ? emp.joining_date.split('T')[0] : new Date().toISOString().split('T')[0]}"></div>
             <div style="display: flex; gap: 1rem; margin-top: 1rem;">
                 <button id="save-employee-btn" class="btn" onclick="saveEmployee()">Save</button>
@@ -414,6 +454,7 @@ const showEmployeeModal = (emp = null) => {
 
 const saveEmployee = async () => {
     const id = document.getElementById('emp-id').value;
+    const type = document.getElementById('emp-type').value;
     const emailInput = document.getElementById('emp-email').value;
     const data = {
         full_name: document.getElementById('emp-name').value,
@@ -422,7 +463,8 @@ const saveEmployee = async () => {
         department: document.getElementById('emp-dept').value,
         designation: document.getElementById('emp-desig').value,
         basic_salary: document.getElementById('emp-salary').value,
-        joining_date: document.getElementById('emp-joining').value
+        joining_date: document.getElementById('emp-joining').value,
+        employee_type: type
     };
 
     if (!data.full_name || !data.basic_salary) {
@@ -450,9 +492,9 @@ const saveEmployee = async () => {
         const resData = await response.json();
         if (response.ok) {
             closeModal('employee-modal');
-            await fetchEmployees();
-            // Focus back on the Add Employee button so hitting Enter reopens the modal
-            const addBtn = document.getElementById('add-employee-btn');
+            await fetchEmployees(type);
+            // Focus back on the Add button so hitting Enter reopens the modal
+            const addBtn = document.getElementById(type === 'per_day_worker' ? 'add-worker-btn' : 'add-employee-btn');
             if (addBtn) addBtn.focus();
         } else {
             alert(`Error: ${resData.message || 'Failed to save employee'}`);
@@ -470,13 +512,13 @@ const saveEmployee = async () => {
     }
 };
 
-const deleteEmployee = async (id) => {
-    if (confirm('Are you sure you want to delete this employee?')) {
+const deleteEmployee = async (id, type = 'company_employee') => {
+    if (confirm(`Are you sure you want to delete this ${type === 'per_day_worker' ? 'worker' : 'employee'}?`)) {
         await fetch(`${API_BASE_URL}/employees/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${state.token}` }
         });
-        fetchEmployees();
+        fetchEmployees(type);
     }
 };
 
@@ -763,7 +805,7 @@ const showPayrollModal = async () => {
             <div class="form-group">
                 <label>Employee</label>
                 <select id="pay-emp-id" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px;">
-                    ${employees.map(e => `<option value="${e.id}">${e.full_name} (${state.currency}${e.basic_salary})</option>`).join('')}
+                    ${employees.map(e => `<option value="${e.id}">${e.full_name} (${state.currency}${e.basic_salary}${e.employee_type === 'per_day_worker' ? '/Day' : ''})</option>`).join('')}
                 </select>
             </div>
             <div style="display: flex; gap: 1rem;">
@@ -1029,6 +1071,7 @@ window.updateSelectStyle = updateSelectStyle;
 window.getStatusSelectStyle = getStatusSelectStyle;
 window.getLocalDateString = getLocalDateString;
 window.changeAttendanceDate = changeAttendanceDate;
+window.renderWorkers = renderWorkers;
 
 // Handle Enter key navigation in all forms/cards (Auth, Employee Modal, etc.)
 document.addEventListener('keydown', (e) => {

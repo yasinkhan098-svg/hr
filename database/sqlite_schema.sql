@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS employees (
     designation TEXT,
     basic_salary REAL NOT NULL,
     joining_date TEXT,
+    employee_type TEXT DEFAULT 'company_employee',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
 );

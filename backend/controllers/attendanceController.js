@@ -29,7 +29,7 @@ exports.getAttendanceReport = async (req, res) => {
 
     try {
         const [employees] = await db.execute(
-            orgId ? 'SELECT id, full_name FROM employees WHERE organization_id = ?' : 'SELECT id, full_name FROM employees WHERE organization_id IS NULL',
+            orgId ? 'SELECT id, full_name, employee_type FROM employees WHERE organization_id = ?' : 'SELECT id, full_name, employee_type FROM employees WHERE organization_id IS NULL',
             orgId ? [orgId] : []
         );
 
@@ -56,12 +56,17 @@ exports.getAttendanceReport = async (req, res) => {
                 empAdvances[a.day] = a.advance_amount;
             });
 
-            // Auto-mark missing past dates as Absent
+            // Auto-mark missing past dates as Absent (or Leave for company employees on Sundays)
             for (let day = 1; day <= daysInMonth; day++) {
                 if (empAttendance[day] === undefined) {
                     const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     if (formattedDate <= todayStr) {
-                        empAttendance[day] = 'Absent';
+                        const isSun = new Date(year, month - 1, day).getDay() === 0;
+                        if (isSun && emp.employee_type !== 'per_day_worker') {
+                            empAttendance[day] = 'Leave';
+                        } else {
+                            empAttendance[day] = 'Absent';
+                        }
                         empAdvances[day] = 0;
                     }
                 }
@@ -111,15 +116,31 @@ exports.getTodayAttendance = async (req, res) => {
         const day = String(today.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`;
 
-        // Auto-mark as 'Absent' if not in database and targetDate is today or past
+        // Auto-mark as 'Absent' or 'Leave' (for Sundays) if not in database and targetDate is today or past
         if (targetDate <= todayStr) {
+            const [employeesWithType] = await db.execute(
+                orgId 
+                    ? `SELECT id, employee_type FROM employees WHERE organization_id = ?`
+                    : `SELECT id, employee_type FROM employees WHERE organization_id IS NULL`,
+                orgId ? [orgId] : []
+            );
+            const typeMap = {};
+            employeesWithType.forEach(e => {
+                typeMap[e.id] = e.employee_type || 'company_employee';
+            });
+
+            const parts = targetDate.split('-');
+            const isSun = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay() === 0;
+
             for (const emp of employees) {
                 if (!markedMap.has(emp.id)) {
+                    const empType = typeMap[emp.id];
+                    const defaultStatus = (isSun && empType !== 'per_day_worker') ? 'Leave' : 'Absent';
                     await db.execute(
                         `INSERT INTO attendance (organization_id, employee_id, date, status, advance_amount) 
-                         VALUES (?, ?, ?, 'Absent', 0)
-                         ON CONFLICT(employee_id, date) DO UPDATE SET status = 'Absent'`,
-                        [orgId, emp.id, targetDate]
+                         VALUES (?, ?, ?, ?, 0)
+                         ON CONFLICT(employee_id, date) DO UPDATE SET status = ?`,
+                        [orgId, emp.id, targetDate, defaultStatus, defaultStatus]
                     );
                 }
             }
@@ -144,7 +165,7 @@ exports.generateAttendanceReportPDF = async (req, res) => {
     const orgId = req.user.organization_id;
     try {
         const [employees] = await db.execute(
-            orgId ? 'SELECT id, full_name, department FROM employees WHERE organization_id = ?' : 'SELECT id, full_name, department FROM employees WHERE organization_id IS NULL',
+            orgId ? 'SELECT id, full_name, department, employee_type FROM employees WHERE organization_id = ?' : 'SELECT id, full_name, department, employee_type FROM employees WHERE organization_id IS NULL',
             orgId ? [orgId] : []
         );
 
@@ -173,11 +194,16 @@ exports.generateAttendanceReportPDF = async (req, res) => {
         const reportRows = [];
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isSun = new Date(year, month - 1, day).getDay() === 0;
             for (const emp of employees) {
                 let status = attendanceMap[`${emp.id}_${dateStr}`];
                 if (status === undefined) {
                     if (dateStr <= todayStr) {
-                        status = 'Absent';
+                        if (isSun && emp.employee_type !== 'per_day_worker') {
+                            status = 'Leave';
+                        } else {
+                            status = 'Absent';
+                        }
                     } else {
                         status = 'Not Marked';
                     }

@@ -7,6 +7,22 @@ const authToken = process.env.TURSO_AUTH_TOKEN;
 console.log(`Connecting database to: ${url}`);
 const client = createClient({ url, authToken });
 
+// Auto-run schema migration for employee_type column
+const runInitMigration = async () => {
+    try {
+        await client.execute("ALTER TABLE employees ADD COLUMN employee_type TEXT DEFAULT 'company_employee'");
+        console.log("Migration: employee_type column added to employees table successfully.");
+    } catch (err) {
+        // Ignore if column already exists or table doesn't exist yet
+        if (err.message && (err.message.includes('duplicate column') || err.message.includes('already exists') || err.message.includes('no such table'))) {
+            // normal situation, column already exists or table is not created yet
+        } else {
+            console.error("Migration warning:", err.message);
+        }
+    }
+};
+runInitMigration();
+
 // Helper to convert rows to plain JS objects and handle BigInt
 function mapRows(result) {
     if (!result || !result.rows) return [];
