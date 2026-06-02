@@ -228,7 +228,7 @@ const handleLogout = () => {
 const renderDashboardLayout = () => {
     app.innerHTML = `
         <div class="dashboard-wrapper">
-            <aside class="sidebar">
+            <aside class="sidebar" style="overflow-y: auto;">
                 <div class="sidebar-header">
                     <h2 style="font-size: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 10px;">
                         ${state.admin ? state.admin.org_name : 'HR System'}
@@ -239,12 +239,20 @@ const renderDashboardLayout = () => {
                 </div>
                 <ul class="nav-links">
                     <li data-view="dashboard" onclick="navigateTo('dashboard')"><a href="#"><span>Dashboard</span></a></li>
+                    
+                    <li style="padding: 10px 15px 5px 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-weight: bold; pointer-events: none;">Company Employees</li>
                     <li data-view="employees" onclick="navigateTo('employees')"><a href="#"><span>Employees</span></a></li>
-                    <li data-view="workers" onclick="navigateTo('workers')"><a href="#"><span>Per Day Workers</span></a></li>
                     <li data-view="attendance" onclick="navigateTo('attendance')"><a href="#"><span>Attendance</span></a></li>
                     <li data-view="payroll" onclick="navigateTo('payroll')"><a href="#"><span>Payroll</span></a></li>
                     <li data-view="reports" onclick="navigateTo('reports')"><a href="#"><span>Reports</span></a></li>
-                    <li data-view="settings" onclick="navigateTo('settings')"><a href="#"><span>Settings</span></a></li>
+                    
+                    <li style="padding: 15px 15px 5px 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-weight: bold; pointer-events: none;">Per Day Workers</li>
+                    <li data-view="workers" onclick="navigateTo('workers')"><a href="#"><span>Workers</span></a></li>
+                    <li data-view="worker-attendance" onclick="navigateTo('worker-attendance')"><a href="#"><span>Worker Attendance</span></a></li>
+                    <li data-view="worker-payroll" onclick="navigateTo('worker-payroll')"><a href="#"><span>Worker Payroll</span></a></li>
+                    <li data-view="worker-reports" onclick="navigateTo('worker-reports')"><a href="#"><span>Worker Reports</span></a></li>
+                    
+                    <li style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;" data-view="settings" onclick="navigateTo('settings')"><a href="#"><span>Settings</span></a></li>
                     <li onclick="handleLogout()"><a href="#"><span>Logout</span></a></li>
                 </ul>
             </aside>
@@ -270,13 +278,22 @@ const renderView = async () => {
             renderWorkers(contentArea);
             break;
         case 'attendance':
-            renderAttendance(contentArea);
+            renderAttendance(contentArea, 'company_employee');
+            break;
+        case 'worker-attendance':
+            renderAttendance(contentArea, 'per_day_worker');
             break;
         case 'payroll':
-            renderPayroll(contentArea);
+            renderPayroll(contentArea, 'company_employee');
+            break;
+        case 'worker-payroll':
+            renderPayroll(contentArea, 'per_day_worker');
             break;
         case 'reports':
-            renderReports(contentArea);
+            renderReports(contentArea, 'company_employee');
+            break;
+        case 'worker-reports':
+            renderReports(contentArea, 'per_day_worker');
             break;
         case 'settings':
             renderSettings(contentArea);
@@ -573,35 +590,8 @@ const updateSelectStyle = (el) => {
     }
 };
 
-// Attendance
-const renderAttendance = async (container) => {
-    container.innerHTML = `
-        <h1>Daily Attendance</h1>
-        <div class="content-card">
-            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
-                <label>Select Date:</label>
-                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1)">&lt;</button>
-                <input type="date" id="attendance-date" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;" value="${getLocalDateString()}" onchange="fetchTodayAttendance()">
-                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1)">&gt;</button>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Employee Name</th>
-                        <th>Status</th>
-                        <th>Advance (${state.currency})</th>
-                    </tr>
-                </thead>
-                <tbody id="attendance-table-body">
-                    <tr><td colspan="2" style="text-align:center;">Loading...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    `;
-    fetchTodayAttendance();
-};
-
-const changeAttendanceDate = (days) => {
+// Helper for attendance date change (propagates type)
+const changeAttendanceDate = (days, type = 'company_employee') => {
     const el = document.getElementById('attendance-date');
     if (!el) return;
     const parts = el.value.split('-');
@@ -612,10 +602,39 @@ const changeAttendanceDate = (days) => {
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     el.value = `${y}-${m}-${d}`;
-    fetchTodayAttendance();
+    fetchTodayAttendance(type);
 };
 
-const fetchTodayAttendance = async () => {
+// Daily Attendance rendering
+const renderAttendance = async (container, type = 'company_employee') => {
+    const isWorker = type === 'per_day_worker';
+    container.innerHTML = `
+        <h1>${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
+        <div class="content-card">
+            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                <label>Select Date:</label>
+                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1, '${type}')">&lt;</button>
+                <input type="date" id="attendance-date" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;" value="${getLocalDateString()}" onchange="fetchTodayAttendance('${type}')">
+                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1, '${type}')">&gt;</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>${isWorker ? 'Worker Name' : 'Employee Name'}</th>
+                        <th>Status</th>
+                        <th>Advance (${state.currency})</th>
+                    </tr>
+                </thead>
+                <tbody id="attendance-table-body">
+                    <tr><td colspan="3" style="text-align:center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    fetchTodayAttendance(type);
+};
+
+const fetchTodayAttendance = async (type = 'company_employee') => {
     const dateInput = document.getElementById('attendance-date');
     if (!dateInput) return;
     const date = dateInput.value;
@@ -623,14 +642,16 @@ const fetchTodayAttendance = async () => {
     if (tbody) {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>`;
     }
-    const response = await fetch(`${API_BASE_URL}/attendance/today?date=${date}`, {
+    const response = await fetch(`${API_BASE_URL}/attendance/today?date=${date}&employee_type=${type}`, {
         headers: { 'Authorization': `Bearer ${state.token}` }
     });
     const attendance = await response.json();
     if (tbody) {
         tbody.innerHTML = attendance.map(att => {
             const todayStr = getLocalDateString();
-            const defaultStatus = date <= todayStr ? 'Absent' : '';
+            const parts = date.split('-');
+            const isSun = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay() === 0;
+            const defaultStatus = date <= todayStr ? ((isSun && type !== 'per_day_worker') ? 'Leave' : 'Absent') : '';
             const statusVal = att.status || defaultStatus;
 
             return `
@@ -664,35 +685,36 @@ const markAttendance = async (employee_id, status, advance_amount = 0) => {
     });
 };
 
-// Payroll
-const renderPayroll = async (container) => {
+// Payroll Section
+const renderPayroll = async (container, type = 'company_employee') => {
     const m = new Date().getMonth() + 1;
     const y = new Date().getFullYear();
+    const isWorker = type === 'per_day_worker';
     container.innerHTML = `
         <div class="print-only">HR SYSTEM</div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;" class="no-print">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <h1 style="margin: 0;">Payroll Management</h1>
+                <h1 style="margin: 0;">${isWorker ? 'Worker Payroll' : 'Employee Payroll'}</h1>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <select id="payroll-month" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
                         ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${m == i + 1 ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'long' })}</option>`).join('')}
                     </select>
                     <input type="number" id="payroll-year" value="${y}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="fetchPayrollHistory(document.getElementById('payroll-month').value, document.getElementById('payroll-year').value)">Filter</button>
+                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="fetchPayrollHistory(document.getElementById('payroll-month').value, document.getElementById('payroll-year').value, '${type}')">Filter</button>
                 </div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="window.print()">Print List</button>
-                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showPayrollModal()">Calculate Salary</button>
+                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showPayrollModal('${type}')">Calculate Salary</button>
             </div>
         </div>
         <div class="content-card">
             <table>
                 <thead>
                     <tr>
-                        <th>Employee</th>
+                        <th>${isWorker ? 'Worker' : 'Employee'}</th>
                         <th>Month/Year</th>
-                        <th>Basic Salary</th>
+                        <th>${isWorker ? 'Total Base wage' : 'Basic Salary'}</th>
                         <th>Absence</th>
                         <th>Overtime</th>
                         <th>Advances</th>
@@ -703,18 +725,18 @@ const renderPayroll = async (container) => {
                     </tr>
                 </thead>
                 <tbody id="payroll-table-body">
-                    <tr><td colspan="8" style="text-align:center;">No records found.</td></tr>
+                    <tr><td colspan="10" style="text-align:center;">No records found.</td></tr>
                 </tbody>
                 <tfoot id="payroll-table-footer"></tfoot>
             </table>
         </div>
     `;
-    fetchPayrollHistory(m, y);
+    fetchPayrollHistory(m, y, type);
 };
 
-const fetchPayrollHistory = async (month, year) => {
-    let url = `${API_BASE_URL}/payroll/history`;
-    if (month && year) url += `?month=${month}&year=${year}`;
+const fetchPayrollHistory = async (month, year, type = 'company_employee') => {
+    let url = `${API_BASE_URL}/payroll/history?employee_type=${type}`;
+    if (month && year) url += `&month=${month}&year=${year}`;
 
     const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${state.token}` }
@@ -747,7 +769,7 @@ const fetchPayrollHistory = async (month, year) => {
                 <tr>
                     <td>${p.full_name}</td>
                     <td>${p.month}/${p.year}</td>
-                    <td>${state.currency}${p.basic_salary}</td>
+                    <td>${state.currency}${basic.toFixed(2)}</td>
                     <td style="color: var(--danger);">${state.currency}${absence.toFixed(2)}</td>
                     <td style="color: var(--primary-color);">${state.currency}${overtime.toFixed(2)}</td>
                     <td>${state.currency}${advances}</td>
@@ -756,7 +778,7 @@ const fetchPayrollHistory = async (month, year) => {
                     <td>${new Date(p.generated_at).toLocaleDateString()}</td>
                     <td style="white-space: nowrap;" class="no-print">
                         <button class="btn" style="width: auto; padding: 2px 8px; font-size: 0.8rem;" onclick="downloadPayslip(${p.id})">Payslip PDF</button>
-                        <button class="btn" style="width: auto; padding: 2px 8px; font-size: 0.8rem; background: var(--danger);" onclick="deletePayrollRecord(${p.id}, ${p.month}, ${p.year})">Delete</button>
+                        <button class="btn" style="width: auto; padding: 2px 8px; font-size: 0.8rem; background: var(--danger);" onclick="deletePayrollRecord(${p.id}, ${p.month}, ${p.year}, '${type}')">Delete</button>
                     </td>
                 </tr>
             `;
@@ -782,28 +804,30 @@ const fetchPayrollHistory = async (month, year) => {
     }
 };
 
-const deletePayrollRecord = async (id, month, year) => {
+const deletePayrollRecord = async (id, month, year, type = 'company_employee') => {
     if (confirm('Are you sure you want to delete this payroll record?')) {
         await fetch(`${API_BASE_URL}/payroll/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${state.token}` }
         });
-        fetchPayrollHistory(month, year);
+        fetchPayrollHistory(month, year, type);
     }
 };
 
-const showPayrollModal = async () => {
+const showPayrollModal = async (type = 'company_employee') => {
     const resp = await fetch(`${API_BASE_URL}/employees`, { headers: { 'Authorization': `Bearer ${state.token}` } });
-    const employees = await resp.json();
+    const allEmployees = await resp.json();
+    const employees = allEmployees.filter(e => (e.employee_type || 'company_employee') === type);
+    const isWorker = type === 'per_day_worker';
 
     const modal = document.createElement('div');
     modal.id = "payroll-modal";
     modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;";
     modal.innerHTML = `
         <div class="content-card" style="width: 450px;">
-            <h2>Calculate Payroll</h2>
+            <h2>Calculate ${isWorker ? 'Worker' : 'Employee'} Payroll</h2>
             <div class="form-group">
-                <label>Employee</label>
+                <label>${isWorker ? 'Worker' : 'Employee'}</label>
                 <select id="pay-emp-id" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px;">
                     ${employees.map(e => `<option value="${e.id}">${e.full_name} (${state.currency}${e.basic_salary}${e.employee_type === 'per_day_worker' ? '/Day' : ''})</option>`).join('')}
                 </select>
@@ -820,7 +844,7 @@ const showPayrollModal = async () => {
             <div class="form-group"><label>Overtime Hours</label><input type="number" id="pay-ot" value="0"></div>
             <div class="form-group"><label>Deductions (${state.currency})</label><input type="number" id="pay-deduct" value="0"></div>
             <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button class="btn" onclick="handleCalculatePayroll()">Generate</button>
+                <button class="btn" onclick="handleCalculatePayroll('${type}')">Generate</button>
                 <button class="btn" style="background: #777;" onclick="closeModal('payroll-modal')">Cancel</button>
             </div>
         </div>
@@ -828,7 +852,7 @@ const showPayrollModal = async () => {
     document.body.appendChild(modal);
 };
 
-const handleCalculatePayroll = async () => {
+const handleCalculatePayroll = async (type = 'company_employee') => {
     const data = {
         employee_id: document.getElementById('pay-emp-id').value,
         month: document.getElementById('pay-month').value,
@@ -847,7 +871,7 @@ const handleCalculatePayroll = async () => {
     if (response.ok) {
         alert(`${result.message}\nNet Salary: ${state.currency}${result.net_salary}\nAdvances Deducted: ${state.currency}${result.breakdown.totalAdvances}`);
         closeModal('payroll-modal');
-        fetchPayrollHistory(data.month, data.year);
+        fetchPayrollHistory(data.month, data.year, type);
     } else {
         alert(`Error: ${result.message}`);
     }
@@ -875,21 +899,22 @@ const downloadPayslip = async (id) => {
 };
 
 // Toggle Reports
-const renderReports = (container) => {
+const renderReports = (container, type = 'company_employee') => {
+    const isWorker = type === 'per_day_worker';
     container.innerHTML = `
-        <h1>Reports Section</h1>
+        <h1>${isWorker ? 'Worker Reports' : 'Employee Reports'}</h1>
         <div class="stats-grid" style="margin-top: 2rem;">
-            <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="downloadExcelReport()">
+            <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="downloadExcelReport('${type}')">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
                 <h3>Monthly Salary Report</h3>
                 <p>Export all payroll data to Excel</p>
             </div>
-            <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="window.renderDetailedAttendanceReport()">
+            <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="window.renderDetailedAttendanceReport(null, null, '${type}')">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">🗓️</div>
                 <h3>Detailed Attendance</h3>
-                <p>View daily status for all employees</p>
+                <p>View daily status for all ${isWorker ? 'workers' : 'employees'}</p>
             </div>
-            <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="downloadAttendanceReport()">
+            <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="downloadAttendanceReport('${type}')">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
                 <h3>Attendance Report (PDF)</h3>
                 <p>Export attendance records to PDF</p>
@@ -898,9 +923,9 @@ const renderReports = (container) => {
     `;
 };
 
-const downloadExcelReport = async () => {
+const downloadExcelReport = async (type = 'company_employee') => {
     try {
-        const response = await fetch(`${API_BASE_URL}/payroll/report/excel`, {
+        const response = await fetch(`${API_BASE_URL}/payroll/report/excel?employee_type=${type}`, {
             headers: { 'Authorization': `Bearer ${state.token}` }
         });
         if (!response.ok) throw new Error('Failed to export Excel report');
@@ -909,7 +934,7 @@ const downloadExcelReport = async () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `payroll_report.xlsx`;
+        a.download = `${type}_payroll_report.xlsx`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -919,12 +944,12 @@ const downloadExcelReport = async () => {
     }
 };
 
-const downloadAttendanceReport = async () => {
+const downloadAttendanceReport = async (type = 'company_employee') => {
     const m = document.getElementById('report-month')?.value || new Date().getMonth() + 1;
     const y = document.getElementById('report-year')?.value || new Date().getFullYear();
 
     try {
-        const response = await fetch(`${API_BASE_URL}/attendance/report/pdf?month=${m}&year=${y}`, {
+        const response = await fetch(`${API_BASE_URL}/attendance/report/pdf?month=${m}&year=${y}&employee_type=${type}`, {
             headers: { 'Authorization': `Bearer ${state.token}` }
         });
         if (!response.ok) throw new Error('Failed to download attendance report');
@@ -933,7 +958,7 @@ const downloadAttendanceReport = async () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `attendance_report_${m}_${y}.pdf`;
+        a.download = `${type}_attendance_report_${m}_${y}.pdf`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -943,10 +968,11 @@ const downloadAttendanceReport = async () => {
     }
 };
 
-const renderDetailedAttendanceReport = async (month, year) => {
+const renderDetailedAttendanceReport = async (month, year, type = 'company_employee') => {
     const m = month || new Date().getMonth() + 1;
     const y = year || new Date().getFullYear();
-    const response = await fetch(`${API_BASE_URL}/attendance/report?month=${m}&year=${y}`, {
+    const isWorker = type === 'per_day_worker';
+    const response = await fetch(`${API_BASE_URL}/attendance/report?month=${m}&year=${y}&employee_type=${type}`, {
         headers: { 'Authorization': `Bearer ${state.token}` }
     });
     const data = await response.json();
@@ -955,18 +981,18 @@ const renderDetailedAttendanceReport = async (month, year) => {
     contentArea.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <h1 class="no-print" style="margin: 0;">Attendance</h1>
+                <h1 class="no-print" style="margin: 0;">${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
                 <div class="no-print" style="display: flex; gap: 0.5rem; align-items: center;">
                     <select id="report-month" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
                         ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${m == i + 1 ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'long' })}</option>`).join('')}
                     </select>
                     <input type="number" id="report-year" value="${y}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="renderDetailedAttendanceReport(document.getElementById('report-month').value, document.getElementById('report-year').value)">View</button>
+                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="renderDetailedAttendanceReport(document.getElementById('report-month').value, document.getElementById('report-year').value, '${type}')">View</button>
                 </div>
             </div>
-            <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - Attendance Report (${m}/${y})</h1>
+            <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - ${isWorker ? 'Worker' : 'Employee'} Attendance Report (${m}/${y})</h1>
             <div style="display: flex; gap: 0.5rem;" class="no-print">
-                <button class="btn" style="width: auto;" onclick="navigateTo('reports')">Back</button>
+                <button class="btn" style="width: auto;" onclick="renderReports(document.getElementById('main-content-area'), '${type}')">Back</button>
                 <button class="btn" style="width: auto; background: #6c757d;" onclick="window.print()">Print Report</button>
             </div>
         </div>
@@ -974,7 +1000,7 @@ const renderDetailedAttendanceReport = async (month, year) => {
             <table class="report-table" style="font-size: 0.8rem;">
                 <thead>
                     <tr>
-                        <th style="position: sticky; left: 0; background: #fff;">Employee</th>
+                        <th style="position: sticky; left: 0; background: #fff;">${isWorker ? 'Worker' : 'Employee'}</th>
                         ${Array.from({ length: data.daysInMonth }, (_, i) => `<th>${i + 1}</th>`).join('')}
                     </tr>
                 </thead>
@@ -983,21 +1009,21 @@ const renderDetailedAttendanceReport = async (month, year) => {
                         <tr>
                             <td style="position: sticky; left: 0; background: #fff; font-weight: bold; white-space: nowrap;">${emp.full_name}</td>
                             ${Array.from({ length: data.daysInMonth }, (_, i) => {
-        const day = i + 1;
-        const status = emp.days[day];
-        const advance = emp.advances[day];
-        let color = '#fff';
-        if (status === 'Present') color = '#d4edda';
-        if (status === 'Absent') color = '#f8d7da';
-        if (status === 'Leave') color = '#fff3cd';
-        if (status === 'Half') color = '#cce5ff';
+                                const day = i + 1;
+                                const status = emp.days[day];
+                                const advance = emp.advances[day];
+                                let color = '#fff';
+                                if (status === 'Present') color = '#d4edda';
+                                if (status === 'Absent') color = '#f8d7da';
+                                if (status === 'Leave') color = '#fff3cd';
+                                if (status === 'Half') color = '#cce5ff';
 
-        return `
+                                return `
                                     <td style="background: ${color}; text-align: center; width: 40px; padding: 4px; vertical-align: middle;">
                                         <div style="font-weight: bold;">${status ? status[0] : '-'}</div>
                                         ${advance > 0 ? `<div style="font-size: 0.6rem; color: #666;">${state.currency}${parseFloat(advance)}</div>` : ''}
                                     </td>`;
-    }).join('')}
+                            }).join('')}
                         </tr>
                     `).join('')}
                 </tbody>

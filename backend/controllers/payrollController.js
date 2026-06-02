@@ -123,17 +123,17 @@ exports.calculatePayroll = async (req, res) => {
 
 exports.getPayrollHistory = async (req, res) => {
     const orgId = req.user.organization_id;
-    const { month, year } = req.query;
+    const { month, year, employee_type = 'company_employee' } = req.query;
     try {
         let query = `SELECT p.*, e.full_name 
                      FROM payroll p 
                      JOIN employees e ON p.employee_id = e.id
-                     WHERE ${orgId ? 'p.organization_id = ?' : 'p.organization_id IS NULL'}`;
-        let params = orgId ? [orgId] : [];
+                     WHERE e.employee_type = ? AND ${orgId ? 'p.organization_id = ?' : 'p.organization_id IS NULL'}`;
+        let params = orgId ? [employee_type, orgId] : [employee_type];
 
         if (month && year) {
             query += ` AND p.month = ? AND p.year = ?`;
-            params = orgId ? [orgId, month, year] : [month, year];
+            params = orgId ? [employee_type, orgId, month, year] : [employee_type, month, year];
         }
 
         query += ` ORDER BY p.generated_at DESC`;
@@ -280,13 +280,14 @@ exports.generatePayslip = async (req, res) => {
 
 exports.exportPayrollToExcel = async (req, res) => {
     const orgId = req.user.organization_id;
+    const { employee_type = 'company_employee' } = req.query;
     try {
         const [rows] = await db.execute(
             `SELECT p.*, e.full_name 
              FROM payroll p 
              JOIN employees e ON p.employee_id = e.id
-             WHERE ${orgId ? 'p.organization_id = ?' : 'p.organization_id IS NULL'}`,
-            orgId ? [orgId] : []
+             WHERE e.employee_type = ? AND ${orgId ? 'p.organization_id = ?' : 'p.organization_id IS NULL'}`,
+            orgId ? [employee_type, orgId] : [employee_type]
         );
 
         const workbook = new ExcelJS.Workbook();

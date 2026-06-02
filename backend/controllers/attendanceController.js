@@ -20,7 +20,7 @@ exports.markAttendance = async (req, res) => {
 };
 
 exports.getAttendanceReport = async (req, res) => {
-    const { month, year } = req.query;
+    const { month, year, employee_type = 'company_employee' } = req.query;
     const orgId = req.user.organization_id;
 
     if (!orgId && req.user.username !== 'admin') {
@@ -29,15 +29,21 @@ exports.getAttendanceReport = async (req, res) => {
 
     try {
         const [employees] = await db.execute(
-            orgId ? 'SELECT id, full_name, employee_type FROM employees WHERE organization_id = ?' : 'SELECT id, full_name, employee_type FROM employees WHERE organization_id IS NULL',
-            orgId ? [orgId] : []
+            orgId 
+                ? 'SELECT id, full_name, employee_type FROM employees WHERE organization_id = ? AND employee_type = ?' 
+                : 'SELECT id, full_name, employee_type FROM employees WHERE organization_id IS NULL AND employee_type = ?',
+            orgId ? [orgId, employee_type] : [employee_type]
         );
 
         const [attendance] = await db.execute(
-            `SELECT employee_id, CAST(strftime('%d', date) AS INTEGER) as day, status, advance_amount 
-             FROM attendance 
-             WHERE CAST(strftime('%m', date) AS INTEGER) = ? AND CAST(strftime('%Y', date) AS INTEGER) = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
-            orgId ? [month, year, orgId] : [month, year]
+            `SELECT a.employee_id, CAST(strftime('%d', a.date) AS INTEGER) as day, a.status, a.advance_amount 
+             FROM attendance a
+             JOIN employees e ON a.employee_id = e.id
+             WHERE CAST(strftime('%m', a.date) AS INTEGER) = ? 
+               AND CAST(strftime('%Y', a.date) AS INTEGER) = ? 
+               AND e.employee_type = ?
+               AND ${orgId ? 'a.organization_id = ?' : 'a.organization_id IS NULL'}`,
+            orgId ? [month, year, employee_type, orgId] : [month, year, employee_type]
         );
 
         const daysInMonth = new Date(year, month, 0).getDate();
@@ -88,23 +94,27 @@ exports.getAttendanceReport = async (req, res) => {
 };
 
 exports.getTodayAttendance = async (req, res) => {
-    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
+    const { date, employee_type = 'company_employee' } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
     const orgId = req.user.organization_id;
     try {
-        // Get all employees for this organization
+        // Get employees matching this type
         const [employees] = await db.execute(
             orgId 
-                ? `SELECT id, full_name FROM employees WHERE organization_id = ?`
-                : `SELECT id, full_name FROM employees WHERE organization_id IS NULL`,
-            orgId ? [orgId] : []
+                ? `SELECT id, full_name FROM employees WHERE organization_id = ? AND employee_type = ?`
+                : `SELECT id, full_name FROM employees WHERE organization_id IS NULL AND employee_type = ?`,
+            orgId ? [orgId, employee_type] : [employee_type]
         );
 
-        // Get existing attendance records for targetDate
+        // Get existing attendance records for targetDate and this type
         const [attendance] = await db.execute(
-            orgId 
-                ? `SELECT employee_id, status FROM attendance WHERE date = ? AND organization_id = ?`
-                : `SELECT employee_id, status FROM attendance WHERE date = ? AND organization_id IS NULL`,
-            orgId ? [targetDate, orgId] : [targetDate]
+            `SELECT a.employee_id, a.status 
+             FROM attendance a
+             JOIN employees e ON a.employee_id = e.id
+             WHERE a.date = ? 
+               AND e.employee_type = ?
+               AND ${orgId ? 'a.organization_id = ?' : 'a.organization_id IS NULL'}`,
+            orgId ? [targetDate, employee_type, orgId] : [targetDate, employee_type]
         );
 
         const markedMap = new Set(attendance.map(a => a.employee_id));
@@ -118,24 +128,12 @@ exports.getTodayAttendance = async (req, res) => {
 
         // Auto-mark as 'Absent' or 'Leave' (for Sundays) if not in database and targetDate is today or past
         if (targetDate <= todayStr) {
-            const [employeesWithType] = await db.execute(
-                orgId 
-                    ? `SELECT id, employee_type FROM employees WHERE organization_id = ?`
-                    : `SELECT id, employee_type FROM employees WHERE organization_id IS NULL`,
-                orgId ? [orgId] : []
-            );
-            const typeMap = {};
-            employeesWithType.forEach(e => {
-                typeMap[e.id] = e.employee_type || 'company_employee';
-            });
-
             const parts = targetDate.split('-');
             const isSun = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay() === 0;
 
             for (const emp of employees) {
                 if (!markedMap.has(emp.id)) {
-                    const empType = typeMap[emp.id];
-                    const defaultStatus = (isSun && empType !== 'per_day_worker') ? 'Leave' : 'Absent';
+                    const defaultStatus = (isSun && employee_type !== 'per_day_worker') ? 'Leave' : 'Absent';
                     await db.execute(
                         `INSERT INTO attendance (organization_id, employee_id, date, status, advance_amount) 
                          VALUES (?, ?, ?, ?, 0)
@@ -150,8 +148,8 @@ exports.getTodayAttendance = async (req, res) => {
             `SELECT e.id, e.full_name, a.status, a.advance_amount 
              FROM employees e 
              LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = ?
-             WHERE ${orgId ? 'e.organization_id = ?' : 'e.organization_id IS NULL'}`,
-            orgId ? [targetDate, orgId] : [targetDate]
+             WHERE e.employee_type = ? AND ${orgId ? 'e.organization_id = ?' : 'e.organization_id IS NULL'}`,
+            orgId ? [targetDate, employee_type, orgId] : [targetDate, employee_type]
         );
         res.json(rows);
     } catch (error) {
@@ -161,19 +159,25 @@ exports.getTodayAttendance = async (req, res) => {
 };
 
 exports.generateAttendanceReportPDF = async (req, res) => {
-    const { month, year } = req.query;
+    const { month, year, employee_type = 'company_employee' } = req.query;
     const orgId = req.user.organization_id;
     try {
         const [employees] = await db.execute(
-            orgId ? 'SELECT id, full_name, department, employee_type FROM employees WHERE organization_id = ?' : 'SELECT id, full_name, department, employee_type FROM employees WHERE organization_id IS NULL',
-            orgId ? [orgId] : []
+            orgId 
+                ? 'SELECT id, full_name, department, employee_type FROM employees WHERE organization_id = ? AND employee_type = ?' 
+                : 'SELECT id, full_name, department, employee_type FROM employees WHERE organization_id IS NULL AND employee_type = ?',
+            orgId ? [orgId, employee_type] : [employee_type]
         );
 
         const [attendance] = await db.execute(
-            `SELECT date, status, employee_id
-             FROM attendance 
-             WHERE CAST(strftime('%m', date) AS INTEGER) = ? AND CAST(strftime('%Y', date) AS INTEGER) = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
-            orgId ? [month, year, orgId] : [month, year]
+            `SELECT a.date, a.status, a.employee_id
+             FROM attendance a
+             JOIN employees e ON a.employee_id = e.id
+             WHERE CAST(strftime('%m', a.date) AS INTEGER) = ? 
+               AND CAST(strftime('%Y', a.date) AS INTEGER) = ? 
+               AND e.employee_type = ?
+               AND ${orgId ? 'a.organization_id = ?' : 'a.organization_id IS NULL'}`,
+            orgId ? [month, year, employee_type, orgId] : [month, year, employee_type]
         );
 
         const daysInMonth = new Date(year, month, 0).getDate();
