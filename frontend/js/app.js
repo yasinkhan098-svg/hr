@@ -383,7 +383,7 @@ const showEmployeeModal = (emp = null) => {
             <div class="form-group"><label>Basic Salary</label><input type="number" id="emp-salary" value="${emp ? emp.basic_salary : ''}"></div>
             <div class="form-group"><label>Joining Date</label><input type="date" id="emp-joining" value="${emp ? emp.joining_date.split('T')[0] : new Date().toISOString().split('T')[0]}"></div>
             <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button class="btn" onclick="saveEmployee()">Save</button>
+                <button id="save-employee-btn" class="btn" onclick="saveEmployee()">Save</button>
                 <button class="btn" style="background: #777;" onclick="closeModal('employee-modal')">Cancel</button>
             </div>
         </div>
@@ -430,6 +430,13 @@ const saveEmployee = async () => {
         return;
     }
 
+    const saveBtn = document.getElementById('save-employee-btn');
+    if (saveBtn) {
+        if (saveBtn.disabled) return;
+        saveBtn.disabled = true;
+        saveBtn.innerText = 'Saving...';
+    }
+
     const method = id ? 'PUT' : 'POST';
     const url = id ? `${API_BASE_URL}/employees/${id}` : `${API_BASE_URL}/employees`;
 
@@ -449,9 +456,17 @@ const saveEmployee = async () => {
             if (addBtn) addBtn.focus();
         } else {
             alert(`Error: ${resData.message || 'Failed to save employee'}`);
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerText = 'Save';
+            }
         }
     } catch (error) {
         alert('Server communication error. Make sure backend is running.');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'Save';
+        }
     }
 };
 
