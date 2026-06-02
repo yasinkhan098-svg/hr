@@ -973,17 +973,19 @@ window.updateSelectStyle = updateSelectStyle;
 window.getStatusSelectStyle = getStatusSelectStyle;
 window.getLocalDateString = getLocalDateString;
 
-// Handle Enter key navigation in Auth Forms
+// Handle Enter key navigation in all forms/cards (Auth, Employee Modal, etc.)
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         const active = document.activeElement;
-        if (active && active.tagName === 'INPUT' && active.closest('.auth-container')) {
-            e.preventDefault();
-            const card = active.closest('.login-card') || active.closest('.register-card');
+        if (active && active.tagName === 'INPUT') {
+            const card = active.closest('.login-card') || 
+                         active.closest('.register-card') || 
+                         active.closest('.content-card');
             if (card) {
-                const inputs = Array.from(card.querySelectorAll('input'));
+                const inputs = Array.from(card.querySelectorAll('input:not([type="hidden"])'));
                 const currentIndex = inputs.indexOf(active);
                 if (currentIndex !== -1) {
+                    e.preventDefault();
                     if (currentIndex < inputs.length - 1) {
                         inputs[currentIndex + 1].focus();
                     } else {
