@@ -126,21 +126,26 @@ exports.getTodayAttendance = async (req, res) => {
         const day = String(today.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`;
 
-        // Auto-mark as 'Absent' or 'Leave' (for Sundays) if not in database and targetDate is today or past
+        // Auto-mark missing employees — bulk INSERT in one batch (no loop of awaits)
         if (targetDate <= todayStr) {
             const parts = targetDate.split('-');
             const isSun = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay() === 0;
 
-            for (const emp of employees) {
-                if (!markedMap.has(emp.id)) {
+            const missingEmployees = employees.filter(emp => !markedMap.has(emp.id));
+
+            if (missingEmployees.length > 0) {
+                // Build one INSERT per missing employee and run all in parallel
+                const insertPromises = missingEmployees.map(emp => {
                     const defaultStatus = (isSun && employee_type !== 'per_day_worker') ? 'Leave' : 'Absent';
-                    await db.execute(
+                    return db.execute(
                         `INSERT INTO attendance (organization_id, employee_id, date, status, advance_amount) 
                          VALUES (?, ?, ?, ?, 0)
-                         ON CONFLICT(employee_id, date) DO UPDATE SET status = ?`,
-                        [orgId, emp.id, targetDate, defaultStatus, defaultStatus]
+                         ON CONFLICT(employee_id, date) DO UPDATE SET status = excluded.status`,
+                        [orgId, emp.id, targetDate, defaultStatus]
                     );
-                }
+                });
+                // Fire all inserts concurrently instead of one-by-one
+                await Promise.all(insertPromises);
             }
         }
 

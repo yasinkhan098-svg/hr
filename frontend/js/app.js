@@ -6,7 +6,9 @@ const state = {
     token: sessionStorage.getItem('token'),
     admin: JSON.parse(sessionStorage.getItem('admin')),
     currency: localStorage.getItem('currency') || '₹',
-    currentView: 'dashboard'
+    currentView: 'dashboard',
+    // Cache employees per type so attendance table renders instantly on date change
+    employeeCache: {} // { 'company_employee': [...], 'per_day_worker': [...] }
 };
 
 const app = document.getElementById('app');
@@ -640,9 +642,6 @@ const fetchTodayAttendance = async (type = 'company_employee') => {
     if (!dateInput) return;
     const date = dateInput.value;
     const tbody = document.getElementById('attendance-table-body');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>`;
-    }
 
     // Detect if selected date is Sunday
     const parts = date.split('-');
@@ -656,23 +655,12 @@ const fetchTodayAttendance = async (type = 'company_employee') => {
     const banner = document.getElementById('sunday-banner');
     if (banner) banner.style.display = isSundayHoliday ? 'inline-block' : 'none';
 
-    const response = await fetch(`${API_BASE_URL}/attendance/today?date=${date}&employee_type=${type}`, {
-        headers: { 'Authorization': `Bearer ${state.token}` }
-    });
-    const attendance = await response.json();
-    if (tbody) {
+    // ── INSTANT RENDER: agar employees cache mein hain toh Loading... mat dikhao ──
+    if (tbody && state.employeeCache[type] && state.employeeCache[type].length > 0) {
         const todayStr = getLocalDateString();
-        tbody.innerHTML = attendance.map(att => {
+        tbody.innerHTML = state.employeeCache[type].map(emp => {
             const defaultStatus = date <= todayStr ? (isSundayHoliday ? 'Leave' : 'Absent') : '';
-            const statusVal = att.status || defaultStatus;
-
-            // Row background: rose tint on Sunday for company employees
             const rowStyle = isSundayHoliday ? 'background:#fff0f0;' : '';
-
-            // No badge next to name — plain name only
-            const nameBadge = '';
-
-            // Sunday: show static pill label — no dropdown, no interaction needed
             const statusCell = isSundayHoliday
                 ? `<span style="
                       display: inline-block;
@@ -686,26 +674,83 @@ const fetchTodayAttendance = async (type = 'company_employee') => {
                       box-shadow: 0 2px 6px rgba(192,57,43,0.3);
                       user-select: none;
                    ">☀ Sunday (Holiday)</span>`
-                : `<select id="status-${att.id}" onchange="markAttendance(${att.id}, this.value, document.getElementById('adv-${att.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${getStatusSelectStyle(statusVal)} transition: all 0.2s ease;">
-                        <option value="" ${statusVal === '' ? 'selected' : ''} style="background-color: #fff; color: #333;">Not Marked</option>
-                        <option value="Present" ${statusVal === 'Present' ? 'selected' : ''} style="background-color: #d4edda; color: #155724;">Present</option>
-                        <option value="Absent" ${statusVal === 'Absent' ? 'selected' : ''} style="background-color: #f8d7da; color: #721c24;">Absent</option>
-                        <option value="Leave" ${statusVal === 'Leave' ? 'selected' : ''} style="background-color: #fff3cd; color: #856404;">Leave</option>
-                        <option value="Half" ${statusVal === 'Half' ? 'selected' : ''} style="background-color: #cce5ff; color: #004085;">Half Day</option>
+                : `<select id="status-${emp.id}" onchange="markAttendance(${emp.id}, this.value, document.getElementById('adv-${emp.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${getStatusSelectStyle(defaultStatus)} transition: all 0.2s ease;">
+                        <option value="" ${defaultStatus === '' ? 'selected' : ''} style="background-color: #fff; color: #333;">Not Marked</option>
+                        <option value="Present" ${defaultStatus === 'Present' ? 'selected' : ''} style="background-color: #d4edda; color: #155724;">Present</option>
+                        <option value="Absent" ${defaultStatus === 'Absent' ? 'selected' : ''} style="background-color: #f8d7da; color: #721c24;">Absent</option>
+                        <option value="Leave" ${defaultStatus === 'Leave' ? 'selected' : ''} style="background-color: #fff3cd; color: #856404;">Leave</option>
+                        <option value="Half" ${defaultStatus === 'Half' ? 'selected' : ''} style="background-color: #cce5ff; color: #004085;">Half Day</option>
                    </select>`;
-
             return `
             <tr style="${rowStyle}">
-                <td>${att.full_name}${nameBadge}</td>
+                <td>${emp.full_name}</td>
                 <td>${statusCell}</td>
                 <td>
-                    <input type="number" id="adv-${att.id}" value="${parseFloat(att.advance_amount || 0)}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;" onchange="markAttendance(${att.id}, 'Leave', this.value)" onkeydown="if(event.key === 'Enter') this.blur();">
+                    <input type="number" id="adv-${emp.id}" value="0" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;" onchange="markAttendance(${emp.id}, 'Leave', this.value)" onkeydown="if(event.key === 'Enter') this.blur();">
                 </td>
-            </tr>
-        `;
+            </tr>`;
         }).join('');
+    } else if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>`;
+    }
+
+    // ── BACKGROUND FETCH: real data se update karo ──
+    try {
+        const response = await fetch(`${API_BASE_URL}/attendance/today?date=${date}&employee_type=${type}`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const attendance = await response.json();
+
+        // Cache employee list for future instant renders
+        state.employeeCache[type] = attendance.map(a => ({ id: a.id, full_name: a.full_name }));
+
+        const tbodyNow = document.getElementById('attendance-table-body');
+        if (tbodyNow) {
+            const todayStr = getLocalDateString();
+            tbodyNow.innerHTML = attendance.map(att => {
+                const defaultStatus = date <= todayStr ? (isSundayHoliday ? 'Leave' : 'Absent') : '';
+                const statusVal = att.status || defaultStatus;
+
+                // Row background: rose tint on Sunday for company employees
+                const rowStyle = isSundayHoliday ? 'background:#fff0f0;' : '';
+
+                // Sunday: show static pill label — no dropdown, no interaction needed
+                const statusCell = isSundayHoliday
+                    ? `<span style="
+                          display: inline-block;
+                          background: linear-gradient(135deg, #c0392b, #e74c3c);
+                          color: #fff;
+                          font-weight: bold;
+                          font-size: 0.85rem;
+                          padding: 6px 16px;
+                          border-radius: 20px;
+                          letter-spacing: 0.03em;
+                          box-shadow: 0 2px 6px rgba(192,57,43,0.3);
+                          user-select: none;
+                       ">☀ Sunday (Holiday)</span>`
+                    : `<select id="status-${att.id}" onchange="markAttendance(${att.id}, this.value, document.getElementById('adv-${att.id}').value); updateSelectStyle(this);" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd; ${getStatusSelectStyle(statusVal)} transition: all 0.2s ease;">
+                            <option value="" ${statusVal === '' ? 'selected' : ''} style="background-color: #fff; color: #333;">Not Marked</option>
+                            <option value="Present" ${statusVal === 'Present' ? 'selected' : ''} style="background-color: #d4edda; color: #155724;">Present</option>
+                            <option value="Absent" ${statusVal === 'Absent' ? 'selected' : ''} style="background-color: #f8d7da; color: #721c24;">Absent</option>
+                            <option value="Leave" ${statusVal === 'Leave' ? 'selected' : ''} style="background-color: #fff3cd; color: #856404;">Leave</option>
+                            <option value="Half" ${statusVal === 'Half' ? 'selected' : ''} style="background-color: #cce5ff; color: #004085;">Half Day</option>
+                       </select>`;
+
+                return `
+                <tr style="${rowStyle}">
+                    <td>${att.full_name}</td>
+                    <td>${statusCell}</td>
+                    <td>
+                        <input type="number" id="adv-${att.id}" value="${parseFloat(att.advance_amount || 0)}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;" onchange="markAttendance(${att.id}, 'Leave', this.value)" onkeydown="if(event.key === 'Enter') this.blur();">
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+    } catch (e) {
+        console.error('Attendance fetch error:', e);
     }
 };
+
 
 const markAttendance = async (employee_id, status, advance_amount = 0) => {
     const val = parseFloat(advance_amount) || 0;
