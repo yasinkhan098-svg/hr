@@ -515,6 +515,22 @@ const saveEmployee = async () => {
             // Focus back on the Add button so hitting Enter reopens the modal
             const addBtn = document.getElementById(type === 'per_day_worker' ? 'add-worker-btn' : 'add-employee-btn');
             if (addBtn) addBtn.focus();
+
+            // Agar yeh edit tha (id exist karta hai) toh payroll table bhi refresh karo
+            // Backend ka recalculation thoda time leta hai — 800ms baad refresh
+            if (id) {
+                setTimeout(() => {
+                    const payrollTbody = document.getElementById('payroll-table-body');
+                    if (payrollTbody) {
+                        // Payroll table visible hai — current month/year ke filters ke saath re-fetch karo
+                        const monthEl = document.getElementById('payroll-month');
+                        const yearEl = document.getElementById('payroll-year');
+                        const month = monthEl ? monthEl.value : (new Date().getMonth() + 1);
+                        const year = yearEl ? yearEl.value : new Date().getFullYear();
+                        fetchPayrollHistory(month, year, type);
+                    }
+                }, 800);
+            }
         } else {
             alert(`Error: ${resData.message || 'Failed to save employee'}`);
             if (saveBtn) {
