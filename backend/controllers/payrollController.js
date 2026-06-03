@@ -2,6 +2,131 @@ const db = require('../config/db');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 
+/**
+ * Shared helper: Payroll calculation karo aur agar pehle se payroll record exist karta hai
+ * toh use UPDATE karo. Agar exist nahi karta toh kuch nahi karo (silent skip).
+ * 
+ * @param {number} employee_id
+ * @param {number} month
+ * @param {number} year
+ * @param {number|null} orgId
+ * @param {object} overrides - { overtime_hours, deductions } — existing record se preserve hote hain
+ * @returns {object|null} Updated payroll data ya null agar payroll exist nahi karta
+ */
+const recalculatePayrollForEmployee = async (employee_id, month, year, orgId, overrides = {}) => {
+    const m = parseInt(month);
+    const y = parseInt(year);
+
+    // Check if payroll record already exists for this employee/month/year
+    const [existing] = await db.execute(
+        `SELECT id, overtime_amount, deductions FROM payroll 
+         WHERE employee_id = ? AND month = ? AND year = ? 
+           AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
+        orgId ? [employee_id, m, y, orgId] : [employee_id, m, y]
+    );
+
+    // Agar payroll exist nahi karta — skip (auto-create nahi karenge)
+    if (existing.length === 0) return null;
+
+    const existingRecord = existing[0];
+
+    // Preserve existing overtime and deductions unless explicitly overridden
+    const overtime_hours = overrides.overtime_hours !== undefined
+        ? parseFloat(overrides.overtime_hours)
+        : null; // null means we'll compute from stored overtime_amount below
+    const manual_deductions = overrides.deductions !== undefined
+        ? parseFloat(overrides.deductions)
+        : parseFloat(existingRecord.deductions || 0);
+
+    // Get Employee Details (fresh from DB — salary may have changed)
+    const [empRows] = await db.execute(
+        `SELECT basic_salary, employee_type FROM employees WHERE id = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
+        orgId ? [employee_id, orgId] : [employee_id]
+    );
+    if (empRows.length === 0) return null;
+
+    const rate = parseFloat(empRows[0].basic_salary);
+    const employeeType = empRows[0].employee_type || 'company_employee';
+    const daysInMonth = new Date(y, m, 0).getDate();
+
+    let basic_salary, dailyRate;
+    if (employeeType === 'per_day_worker') {
+        basic_salary = rate * daysInMonth;
+        dailyRate = rate;
+    } else {
+        let sundaysInMonth = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+            if (new Date(y, m - 1, d).getDay() === 0) sundaysInMonth++;
+        }
+        const workingDays = daysInMonth - sundaysInMonth;
+        basic_salary = rate;
+        dailyRate = basic_salary / workingDays;
+    }
+
+    // Get fresh Attendance Data
+    const [attnRows] = await db.execute(
+        `SELECT CAST(strftime('%d', date) AS INTEGER) as day, status, advance_amount FROM attendance 
+         WHERE employee_id = ? 
+           AND CAST(strftime('%m', date) AS INTEGER) = ? 
+           AND CAST(strftime('%Y', date) AS INTEGER) = ? 
+           AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
+        orgId ? [employee_id, m, y, orgId] : [employee_id, m, y]
+    );
+
+    const attendanceByDay = {};
+    attnRows.forEach(row => {
+        attendanceByDay[row.day] = {
+            status: row.status,
+            advance_amount: parseFloat(row.advance_amount || 0)
+        };
+    });
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let absentDays = 0;
+    let totalAdvances = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const record = attendanceByDay[day];
+
+        if (record) {
+            if (record.status === 'Absent') absentDays++;
+            else if (record.status === 'Half') absentDays += 0.5;
+            totalAdvances += record.advance_amount;
+        } else if (dateStr <= todayStr) {
+            const isSun = new Date(y, m - 1, day).getDay() === 0;
+            if (!(isSun && employeeType !== 'per_day_worker')) {
+                absentDays++;
+            }
+        }
+    }
+
+    const absenceDeduction = absentDays * dailyRate;
+    const overtime_rate = (basic_salary / 160) * 1.5;
+
+    // Agar overtime_hours override nahi hua toh stored overtime_amount preserve karo
+    const overtime_amount = overtime_hours !== null
+        ? overtime_hours * overtime_rate
+        : parseFloat(existingRecord.overtime_amount || 0);
+
+    const net_salary = basic_salary + overtime_amount - absenceDeduction - totalAdvances - manual_deductions;
+
+    // UPDATE existing payroll record
+    await db.execute(
+        `UPDATE payroll SET basic_salary=?, absence_deduction=?, overtime_amount=?, total_advances=?, deductions=?, net_salary=?, generated_at=CURRENT_TIMESTAMP
+         WHERE id=?`,
+        [basic_salary, absenceDeduction, overtime_amount, totalAdvances, manual_deductions, net_salary, existingRecord.id]
+    );
+
+    console.log(`[Auto-Recalc] Payroll updated: emp=${employee_id} ${m}/${y} → net=${net_salary}`);
+    return { basic_salary, absentDays, absenceDeduction, totalAdvances, overtime_amount, manual_deductions, net_salary };
+};
+
+// Export helper so other controllers can use it
+exports.recalculatePayrollForEmployee = recalculatePayrollForEmployee;
+
 exports.calculatePayroll = async (req, res) => {
     const { employee_id, month, year, overtime_hours = 0, deductions = 0 } = req.body;
     const orgId = req.user.organization_id;
@@ -103,14 +228,32 @@ exports.calculatePayroll = async (req, res) => {
 
         console.log(`Final Calc: Basic=${basic_salary}, OT=${overtime_amount}, Absence=${absenceDeduction}, Advances=${totalAdvances}, ManualDeduct=${manual_deductions}, Net=${net_salary}`);
 
-        // Store in payroll table
-        const [result] = await db.execute(
-            'INSERT INTO payroll (organization_id, employee_id, month, year, basic_salary, absence_deduction, overtime_amount, total_advances, deductions, net_salary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.organization_id, employee_id, m, y, basic_salary, absenceDeduction, overtime_amount, totalAdvances, manual_deductions, net_salary]
+        // Check if payroll already exists for this month/year — UPDATE instead of INSERT
+        const [existingPayroll] = await db.execute(
+            `SELECT id FROM payroll WHERE employee_id = ? AND month = ? AND year = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
+            orgId ? [employee_id, m, y, orgId] : [employee_id, m, y]
         );
 
+        let recordId;
+        if (existingPayroll.length > 0) {
+            // UPDATE existing record
+            await db.execute(
+                `UPDATE payroll SET basic_salary=?, absence_deduction=?, overtime_amount=?, total_advances=?, deductions=?, net_salary=?, generated_at=CURRENT_TIMESTAMP
+                 WHERE id=?`,
+                [basic_salary, absenceDeduction, overtime_amount, totalAdvances, manual_deductions, net_salary, existingPayroll[0].id]
+            );
+            recordId = existingPayroll[0].id;
+        } else {
+            // INSERT new record
+            const [result] = await db.execute(
+                'INSERT INTO payroll (organization_id, employee_id, month, year, basic_salary, absence_deduction, overtime_amount, total_advances, deductions, net_salary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [orgId, employee_id, m, y, basic_salary, absenceDeduction, overtime_amount, totalAdvances, manual_deductions, net_salary]
+            );
+            recordId = result.insertId;
+        }
+
         res.json({
-            id: result.insertId,
+            id: recordId,
             net_salary,
             breakdown: {
                 basic_salary,

@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 
 exports.markAttendance = async (req, res) => {
     const { employee_id, date, status, advance_amount = 0 } = req.body;
+    const orgId = req.user.organization_id;
     try {
         await db.execute(
             `INSERT INTO attendance (organization_id, employee_id, date, status, advance_amount) 
@@ -10,9 +11,22 @@ exports.markAttendance = async (req, res) => {
              ON CONFLICT(employee_id, date) DO UPDATE SET 
              status = excluded.status, 
              advance_amount = excluded.advance_amount`,
-            [req.user.organization_id, employee_id, date, status, advance_amount]
+            [orgId, employee_id, date, status, advance_amount]
         );
         res.json({ message: 'Attendance marked successfully' });
+
+        // Auto-recalculate payroll for this employee's month/year (non-blocking — response already sent)
+        try {
+            const parts = date.split('-');
+            if (parts.length === 3) {
+                const month = parseInt(parts[1]);
+                const year = parseInt(parts[0]);
+                const { recalculatePayrollForEmployee } = require('./payrollController');
+                await recalculatePayrollForEmployee(employee_id, month, year, orgId);
+            }
+        } catch (recalcErr) {
+            console.error('[Auto-Recalc] Error recalculating payroll after attendance mark:', recalcErr);
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

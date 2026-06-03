@@ -58,7 +58,30 @@ exports.updateEmployee = async (req, res) => {
             orgId ? [full_name, emailVal, phone, department, designation, basic_salary, joining_date, employee_type, req.params.id, orgId] : [full_name, emailVal, phone, department, designation, basic_salary, joining_date, employee_type, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ message: 'Employee not found' });
+
+        // Auto-recalculate all existing payroll records for this employee (background, non-blocking for response)
         res.json({ message: 'Employee updated successfully' });
+
+        // Find all payroll months/years for this employee and recalculate
+        try {
+            const { recalculatePayrollForEmployee } = require('./payrollController');
+            const [payrollRecords] = await db.execute(
+                `SELECT DISTINCT month, year FROM payroll 
+                 WHERE employee_id = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
+                orgId ? [req.params.id, orgId] : [req.params.id]
+            );
+
+            if (payrollRecords.length > 0) {
+                await Promise.all(
+                    payrollRecords.map(p =>
+                        recalculatePayrollForEmployee(req.params.id, p.month, p.year, orgId)
+                    )
+                );
+                console.log(`[Auto-Recalc] Salary updated for emp=${req.params.id}, recalculated ${payrollRecords.length} payroll record(s).`);
+            }
+        } catch (recalcErr) {
+            console.error('[Auto-Recalc] Error recalculating payroll after employee update:', recalcErr);
+        }
     } catch (error) {
         console.error(error);
         if (error.code === 'ER_DUP_ENTRY' || error.code === 'SQLITE_CONSTRAINT' || (error.message && error.message.includes('UNIQUE'))) {
