@@ -59,10 +59,7 @@ exports.updateEmployee = async (req, res) => {
         );
         if (result.affectedRows === 0) return res.status(404).json({ message: 'Employee not found' });
 
-        // Auto-recalculate all existing payroll records for this employee (background, non-blocking for response)
-        res.json({ message: 'Employee updated successfully' });
-
-        // Find all payroll months/years for this employee and recalculate
+        // Recalculate payroll BEFORE sending response — frontend gets fresh data immediately
         try {
             const { recalculatePayrollForEmployee } = require('./payrollController');
             const [payrollRecords] = await db.execute(
@@ -70,18 +67,22 @@ exports.updateEmployee = async (req, res) => {
                  WHERE employee_id = ? AND ${orgId ? 'organization_id = ?' : 'organization_id IS NULL'}`,
                 orgId ? [req.params.id, orgId] : [req.params.id]
             );
-
             if (payrollRecords.length > 0) {
+                // All months recalculate in parallel — fast even on remote DB
                 await Promise.all(
                     payrollRecords.map(p =>
                         recalculatePayrollForEmployee(req.params.id, p.month, p.year, orgId)
                     )
                 );
-                console.log(`[Auto-Recalc] Salary updated for emp=${req.params.id}, recalculated ${payrollRecords.length} payroll record(s).`);
+                console.log(`[Auto-Recalc] Done: emp=${req.params.id}, ${payrollRecords.length} month(s) updated.`);
             }
         } catch (recalcErr) {
-            console.error('[Auto-Recalc] Error recalculating payroll after employee update:', recalcErr);
+            // Recalc failure should not block the employee save response
+            console.error('[Auto-Recalc] Error:', recalcErr);
         }
+
+        // Send response only after recalculation is fully complete
+        res.json({ message: 'Employee updated successfully' });
     } catch (error) {
         console.error(error);
         if (error.code === 'ER_DUP_ENTRY' || error.code === 'SQLITE_CONSTRAINT' || (error.message && error.message.includes('UNIQUE'))) {

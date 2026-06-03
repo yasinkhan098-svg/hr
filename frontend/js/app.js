@@ -516,20 +516,16 @@ const saveEmployee = async () => {
             const addBtn = document.getElementById(type === 'per_day_worker' ? 'add-worker-btn' : 'add-employee-btn');
             if (addBtn) addBtn.focus();
 
-            // Agar yeh edit tha (id exist karta hai) toh payroll table bhi refresh karo
-            // Backend ka recalculation thoda time leta hai — 800ms baad refresh
+            // Agar edit tha toh payroll table turant refresh karo (recalculation response se pehle hoti hai)
             if (id) {
-                setTimeout(() => {
-                    const payrollTbody = document.getElementById('payroll-table-body');
-                    if (payrollTbody) {
-                        // Payroll table visible hai — current month/year ke filters ke saath re-fetch karo
-                        const monthEl = document.getElementById('payroll-month');
-                        const yearEl = document.getElementById('payroll-year');
-                        const month = monthEl ? monthEl.value : (new Date().getMonth() + 1);
-                        const year = yearEl ? yearEl.value : new Date().getFullYear();
-                        fetchPayrollHistory(month, year, type);
-                    }
-                }, 800);
+                const payrollTbody = document.getElementById('payroll-table-body');
+                if (payrollTbody) {
+                    const monthEl = document.getElementById('payroll-month');
+                    const yearEl = document.getElementById('payroll-year');
+                    const month = monthEl ? monthEl.value : (new Date().getMonth() + 1);
+                    const year = yearEl ? yearEl.value : new Date().getFullYear();
+                    fetchPayrollHistory(month, year, type);
+                }
             }
         } else {
             alert(`Error: ${resData.message || 'Failed to save employee'}`);
