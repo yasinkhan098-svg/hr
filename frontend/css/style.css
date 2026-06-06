@@ -27,18 +27,48 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    background-image: url('../assets/login-bg.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    position: relative;
+}
+
+.auth-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(0, 103, 79, 0.55) 0%,
+        rgba(0, 130, 100, 0.45) 50%,
+        rgba(0, 168, 232, 0.30) 100%
+    );
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    z-index: 0;
+}
+
+.auth-container > * {
+    position: relative;
+    z-index: 1;
 }
 
 .login-card,
 .welcome-card,
 .register-card {
-    background: var(--white);
+    background: rgba(255, 255, 255, 0.15);
     padding: 2.5rem;
-    border-radius: 15px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    border-radius: 20px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.1);
     width: 450px;
     animation: fadeIn 0.5s ease;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.30);
 }
 
 .register-card {
@@ -62,8 +92,11 @@ body {
 .register-card h2 {
     text-align: center;
     margin-bottom: 2rem;
-    color: var(--primary-color);
+    color: #ffffff;
     font-size: 1.8rem;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 .welcome-card .btn-group {
@@ -73,13 +106,14 @@ body {
 }
 
 .btn-secondary {
-    background: transparent;
-    border: 2px solid var(--primary-color);
-    color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.12);
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    color: #ffffff;
 }
 
 .btn-secondary:hover {
-    background: var(--primary-color);
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.8);
     color: white;
 }
 
@@ -96,29 +130,91 @@ body {
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
+    color: rgba(255, 255, 255, 0.95);
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Labels inside dashboard (non-auth) should stay dark */
+.dashboard-wrapper .form-group label {
+    color: var(--text-color);
+    text-shadow: none;
+    font-weight: normal;
+    font-size: 1rem;
 }
 
 .form-group input {
     width: 100%;
     padding: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.form-group input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.form-group input:focus {
+    border-color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.26);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+/* Dashboard inputs should look normal */
+.dashboard-wrapper .form-group input {
+    background: #ffffff;
     border: 1px solid #ddd;
+    color: var(--text-color);
     border-radius: 5px;
+}
+
+.dashboard-wrapper .form-group input::placeholder {
+    color: #aaa;
+}
+
+.dashboard-wrapper .form-group input:focus {
+    border-color: var(--primary-color);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(0, 103, 79, 0.1);
 }
 
 .btn {
     width: 100%;
     padding: 0.8rem;
     border: none;
-    border-radius: 5px;
+    border-radius: 10px;
     background: var(--primary-color);
     color: white;
     cursor: pointer;
     font-size: 1rem;
-    transition: background 0.3s;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    letter-spacing: 0.03em;
 }
 
 .btn:hover {
     background: var(--secondary-color);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 103, 79, 0.4);
+}
+
+/* Auth page buttons: glass style */
+.auth-container .btn:not(.btn-secondary) {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    box-shadow: 0 4px 15px rgba(0, 103, 79, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.auth-container .btn:not(.btn-secondary):hover {
+    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    box-shadow: 0 8px 25px rgba(0, 103, 79, 0.6);
+    transform: translateY(-2px);
 }
 
 /* Dashboard Layout */

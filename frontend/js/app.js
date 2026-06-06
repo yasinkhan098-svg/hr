@@ -35,7 +35,7 @@ const renderWelcome = () => {
                     <button class="btn" onclick="renderLogin()">Sign In</button>
                     <button class="btn btn-secondary" onclick="renderRegister()">Sign Up / Create Account</button>
                 </div>
-                <p style="margin-top: 2rem; color: #666; font-size: 0.9rem; text-align: center;">
+                <p style="margin-top: 2rem; color: rgba(255,255,255,0.75); font-size: 0.9rem; text-align: center;">
                     Select an option above to manage your organization's attendance and payroll.
                 </p>
             </div>
@@ -83,10 +83,10 @@ const renderRegister = () => {
                     </div>
                 </div>
                 <button class="btn" onclick="handleRegister()" style="margin-top: 1rem;">Register Now</button>
-                <div style="text-align: center; margin-top: 1.5rem;">
-                    Already have an account? <a href="#" onclick="renderLogin()" style="color: var(--primary-color);">Sign In</a>
+                <div style="text-align: center; margin-top: 1.5rem; color: rgba(255,255,255,0.8);">
+                    Already have an account? <a href="#" onclick="renderLogin()" style="color: rgba(255,255,255,0.9); font-weight:600; text-decoration: underline;">Sign In</a>
                 </div>
-                <p id="reg-error" style="color: red; margin-top: 1rem; text-align: center;"></p>
+                <p id="reg-error" style="color: #ffb3b3; margin-top: 1rem; text-align: center; font-weight:500;"></p>
             </div>
         </div>
     `;
@@ -125,11 +125,11 @@ const renderLogin = () => {
                 </div>
                 <button class="btn" onclick="handleLogin()">Login</button>
                 <div style="text-align: center; margin-top: 1.5rem;">
-                    Don't have an account? <a href="#" onclick="renderRegister()" style="color: var(--primary-color);">Sign Up</a>
+                    Don't have an account? <a href="#" onclick="renderRegister()" style="color: rgba(255,255,255,0.9); font-weight:600; text-decoration: underline;">Sign Up</a>
                     <br><br>
-                    <a href="#" onclick="renderWelcome()" style="color: #666; font-size: 0.9rem;">Back to Main</a>
+                    <a href="#" onclick="renderWelcome()" style="color: rgba(255,255,255,0.65); font-size: 0.9rem;">Back to Main</a>
                 </div>
-                <p id="error-msg" style="color: red; margin-top: 1rem; text-align: center;"></p>
+                <p id="error-msg" style="color: #ffb3b3; margin-top: 1rem; text-align: center; font-weight:500;"></p>
             </div>
         </div>
     `;
