@@ -90,6 +90,7 @@ const renderRegister = () => {
             </div>
         </div>
     `;
+    document.getElementById('reg-name').focus();
 };
 
 const navigateTo = (view) => {
@@ -133,6 +134,7 @@ const renderLogin = () => {
             </div>
         </div>
     `;
+    document.getElementById('username').focus();
 };
 
 const handleLogin = async () => {
