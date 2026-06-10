@@ -230,34 +230,46 @@ const handleLogout = () => {
 };
 
 const renderDashboardLayout = () => {
+    const orgName = state.admin ? state.admin.org_name : 'HR System';
+    const userName = state.admin ? state.admin.username : 'Admin';
+
     app.innerHTML = `
+        <!-- Mobile Top Header -->
+        <header class="mobile-header" id="mobile-header">
+            <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+            <span class="mobile-header-title">${orgName}</span>
+            <div style="width:38px;"></div>
+        </header>
+
+        <!-- Sidebar Overlay (mobile only) -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
         <div class="dashboard-wrapper">
-            <aside class="sidebar" style="overflow-y: auto;">
+            <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
-                    <h2 style="font-size: 1.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 10px;">
-                        ${state.admin ? state.admin.org_name : 'HR System'}
-                    </h2>
-                    <p style="font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 5px;">
-                        Welcome, ${state.admin ? state.admin.username : 'Admin'}
-                    </p>
+                    <h2>${orgName}</h2>
+                    <p>Welcome, ${userName}</p>
                 </div>
                 <ul class="nav-links">
-                    <li data-view="dashboard" onclick="navigateTo('dashboard')"><a href="#"><span>Dashboard</span></a></li>
-                    
-                    <li style="padding: 10px 15px 5px 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-weight: bold; pointer-events: none;">Company Employees</li>
-                    <li data-view="employees" onclick="navigateTo('employees')"><a href="#"><span>Employees</span></a></li>
-                    <li data-view="attendance" onclick="navigateTo('attendance')"><a href="#"><span>Attendance</span></a></li>
-                    <li data-view="payroll" onclick="navigateTo('payroll')"><a href="#"><span>Payroll</span></a></li>
-                    <li data-view="reports" onclick="navigateTo('reports')"><a href="#"><span>Reports</span></a></li>
-                    
-                    <li style="padding: 15px 15px 5px 15px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-weight: bold; pointer-events: none;">Per Day Workers</li>
-                    <li data-view="workers" onclick="navigateTo('workers')"><a href="#"><span>Workers</span></a></li>
-                    <li data-view="worker-attendance" onclick="navigateTo('worker-attendance')"><a href="#"><span>Worker Attendance</span></a></li>
-                    <li data-view="worker-payroll" onclick="navigateTo('worker-payroll')"><a href="#"><span>Worker Payroll</span></a></li>
-                    <li data-view="worker-reports" onclick="navigateTo('worker-reports')"><a href="#"><span>Worker Reports</span></a></li>
-                    
-                    <li style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;" data-view="settings" onclick="navigateTo('settings')"><a href="#"><span>Settings</span></a></li>
-                    <li onclick="handleLogout()"><a href="#"><span>Logout</span></a></li>
+                    <li data-view="dashboard" onclick="navigateToMobile('dashboard')"><a href="#">🏠 <span>Dashboard</span></a></li>
+
+                    <li class="nav-section-label">Company Employees</li>
+                    <li data-view="employees" onclick="navigateToMobile('employees')"><a href="#">👥 <span>Employees</span></a></li>
+                    <li data-view="attendance" onclick="navigateToMobile('attendance')"><a href="#">✅ <span>Attendance</span></a></li>
+                    <li data-view="payroll" onclick="navigateToMobile('payroll')"><a href="#">💰 <span>Payroll</span></a></li>
+                    <li data-view="reports" onclick="navigateToMobile('reports')"><a href="#">📊 <span>Reports</span></a></li>
+
+                    <li class="nav-section-label" style="margin-top:6px;">Per Day Workers</li>
+                    <li data-view="workers" onclick="navigateToMobile('workers')"><a href="#">👷 <span>Workers</span></a></li>
+                    <li data-view="worker-attendance" onclick="navigateToMobile('worker-attendance')"><a href="#">📋 <span>Worker Attendance</span></a></li>
+                    <li data-view="worker-payroll" onclick="navigateToMobile('worker-payroll')"><a href="#">💵 <span>Worker Payroll</span></a></li>
+                    <li data-view="worker-reports" onclick="navigateToMobile('worker-reports')"><a href="#">📄 <span>Worker Reports</span></a></li>
+
+                    <li class="nav-divider"></li>
+                    <li data-view="settings" onclick="navigateToMobile('settings')"><a href="#">⚙️ <span>Settings</span></a></li>
+                    <li onclick="handleLogout()"><a href="#" style="color: rgba(255,150,150,0.95);">🚪 <span>Logout</span></a></li>
                 </ul>
             </aside>
             <main class="main-content" id="main-content-area">
@@ -265,6 +277,42 @@ const renderDashboardLayout = () => {
             </main>
         </div>
     `;
+};
+
+// Mobile sidebar helpers
+const toggleSidebar = () => {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const btn = document.getElementById('hamburger-btn');
+    if (!sidebar) return;
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+        closeSidebar();
+    } else {
+        sidebar.classList.add('open');
+        overlay.classList.add('visible');
+        btn && btn.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+};
+
+const closeSidebar = () => {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const btn = document.getElementById('hamburger-btn');
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('visible');
+    if (btn) btn.classList.remove('open');
+    document.body.style.overflow = '';
+};
+
+// Navigate and auto-close sidebar on mobile
+const navigateToMobile = (view) => {
+    navigateTo(view);
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth <= 768) {
+        closeSidebar();
+    }
 };
 
 const renderView = async () => {
@@ -340,30 +388,32 @@ const renderDashboard = async (container) => {
 // Employee Management
 const renderEmployees = async (container) => {
     container.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="page-actions">
             <h1 class="no-print">Employee Management</h1>
             <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - Employee List</h1>
-            <div style="display: flex; gap: 0.5rem;" class="no-print">
-                <button id="add-employee-btn" class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal(null, 'company_employee')">Add Employee</button>
-                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem; background: #6c757d;" onclick="window.print()">Print List</button>
+            <div class="action-buttons no-print">
+                <button id="add-employee-btn" class="btn" onclick="showEmployeeModal(null, 'company_employee')">+ Add Employee</button>
+                <button class="btn" style="background: #6c757d;" onclick="window.print()">🖨 Print</button>
             </div>
         </div>
         <div class="content-card">
-            <table id="employee-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Department</th>
-                        <th>Salary</th>
-                        <th class="no-print">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="employee-table-body">
-                    <tr><td colspan="5" style="text-align:center;">Loading...</td></tr>
-                </tbody>
-            </table>
+            <div class="table-wrapper">
+                <table id="employee-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Department</th>
+                            <th>Salary</th>
+                            <th class="no-print">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employee-table-body">
+                        <tr><td colspan="6" style="text-align:center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
     fetchEmployees('company_employee');
@@ -371,30 +421,32 @@ const renderEmployees = async (container) => {
 
 const renderWorkers = async (container) => {
     container.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="page-actions">
             <h1 class="no-print">Per Day Worker Management</h1>
             <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - Per Day Worker List</h1>
-            <div style="display: flex; gap: 0.5rem;" class="no-print">
-                <button id="add-worker-btn" class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showEmployeeModal(null, 'per_day_worker')">Add Per Day Worker</button>
-                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem; background: #6c757d;" onclick="window.print()">Print List</button>
+            <div class="action-buttons no-print">
+                <button id="add-worker-btn" class="btn" onclick="showEmployeeModal(null, 'per_day_worker')">+ Add Worker</button>
+                <button class="btn" style="background: #6c757d;" onclick="window.print()">🖨 Print</button>
             </div>
         </div>
         <div class="content-card">
-            <table id="employee-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Department</th>
-                        <th>Per Day Amount</th>
-                        <th class="no-print">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="employee-table-body">
-                    <tr><td colspan="5" style="text-align:center;">Loading...</td></tr>
-                </tbody>
-            </table>
+            <div class="table-wrapper">
+                <table id="employee-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Department</th>
+                            <th>Per Day Amount</th>
+                            <th class="no-print">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employee-table-body">
+                        <tr><td colspan="6" style="text-align:center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
     fetchEmployees('per_day_worker');
@@ -430,25 +482,26 @@ const showEmployeeModal = (emp = null, defaultType = 'company_employee') => {
 
     const modal = document.createElement('div');
     modal.id = "employee-modal";
-    modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;";
+    modal.className = "modal-overlay";
     modal.innerHTML = `
-        <div class="content-card" style="width: 500px;">
+        <div class="modal-box">
             <h2>${emp ? 'Edit' : 'Add'} ${isWorker ? 'Per Day Worker' : 'Employee'}</h2>
             <input type="hidden" id="emp-id" value="${emp ? emp.id : ''}">
             <input type="hidden" id="emp-type" value="${type}">
-            <div class="form-group"><label>Full Name</label><input type="text" id="emp-name" value="${emp ? emp.full_name : ''}"></div>
-            <div class="form-group"><label>Email</label><input type="email" id="emp-email" value="${emp ? emp.email || '' : ''}"></div>
-            <div class="form-group"><label>Phone</label><input type="text" id="emp-phone" value="${emp ? emp.phone || '' : ''}"></div>
-            <div class="form-group"><label>Department</label><input type="text" id="emp-dept" value="${emp ? emp.department : ''}"></div>
-            <div class="form-group"><label>Designation</label><input type="text" id="emp-desig" value="${emp ? emp.designation : ''}"></div>
-            <div class="form-group"><label>${isWorker ? 'Per Day Amount' : 'Basic Salary'}</label><input type="number" id="emp-salary" value="${emp ? emp.basic_salary : ''}"></div>
+            <div class="form-group"><label>Full Name</label><input type="text" id="emp-name" value="${emp ? emp.full_name : ''}" placeholder="Enter full name"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="emp-email" value="${emp ? emp.email || '' : ''}" placeholder="Email address"></div>
+            <div class="form-group"><label>Phone</label><input type="text" id="emp-phone" value="${emp ? emp.phone || '' : ''}" placeholder="Phone number"></div>
+            <div class="form-group"><label>Department</label><input type="text" id="emp-dept" value="${emp ? emp.department : ''}" placeholder="Department"></div>
+            <div class="form-group"><label>Designation</label><input type="text" id="emp-desig" value="${emp ? emp.designation : ''}" placeholder="Designation"></div>
+            <div class="form-group"><label>${isWorker ? 'Per Day Amount' : 'Basic Salary'}</label><input type="number" id="emp-salary" value="${emp ? emp.basic_salary : ''}" placeholder="Amount"></div>
             <div class="form-group"><label>Joining Date</label><input type="date" id="emp-joining" value="${emp ? emp.joining_date.split('T')[0] : new Date().toISOString().split('T')[0]}"></div>
-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <div class="modal-actions">
                 <button id="save-employee-btn" class="btn" onclick="saveEmployee()">Save</button>
-                <button class="btn" style="background: #777;" onclick="closeModal('employee-modal')">Cancel</button>
+                <button class="btn" style="background: #777; flex:1;" onclick="closeModal('employee-modal')">Cancel</button>
             </div>
         </div>
     `;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('employee-modal'); });
     document.body.appendChild(modal);
 
     // Focus on Full Name input immediately
@@ -625,27 +678,31 @@ const changeAttendanceDate = (days, type = 'company_employee') => {
 const renderAttendance = async (container, type = 'company_employee') => {
     const isWorker = type === 'per_day_worker';
     container.innerHTML = `
-        <h1>${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
-        <div class="content-card">
-            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                <label>Select Date:</label>
-                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1, '${type}')">&#60;</button>
-                <input type="date" id="attendance-date" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;" value="${getLocalDateString()}" onchange="fetchTodayAttendance('${type}')">
-                <button class="btn" style="width: auto; padding: 5px 12px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1, '${type}')">&#62;</button>
-                <span id="sunday-banner" style="display:none; background:#c0392b; color:#fff; font-weight:bold; padding:4px 14px; border-radius:6px; font-size:0.9rem;">☀ Sunday — Holiday</span>
+        <div class="page-actions">
+            <h1>${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
+            <div class="filter-row" style="margin-top: 10px;">
+                <label>Date:</label>
+                <button class="btn" style="width: auto; padding: 6px 14px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(-1, '${type}')">&lt;</button>
+                <input type="date" id="attendance-date" value="${getLocalDateString()}" onchange="fetchTodayAttendance('${type}')">
+                <button class="btn" style="width: auto; padding: 6px 14px; margin: 0; background: #6c757d;" onclick="changeAttendanceDate(1, '${type}')">&gt;</button>
+                <span id="sunday-banner" style="display:none; background:#c0392b; color:#fff; font-weight:bold; padding:4px 14px; border-radius:6px; font-size:0.88rem;">☀ Sunday — Holiday</span>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>${isWorker ? 'Worker Name' : 'Employee Name'}</th>
-                        <th>Status</th>
-                        <th>Advance (${state.currency})</th>
-                    </tr>
-                </thead>
-                <tbody id="attendance-table-body">
-                    <tr><td colspan="3" style="text-align:center;">Loading...</td></tr>
-                </tbody>
-            </table>
+        </div>
+        <div class="content-card">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>${isWorker ? 'Worker Name' : 'Employee Name'}</th>
+                            <th>Status</th>
+                            <th>Advance (${state.currency})</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-table-body">
+                        <tr><td colspan="3" style="text-align:center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
     fetchTodayAttendance(type);
@@ -783,43 +840,43 @@ const renderPayroll = async (container, type = 'company_employee') => {
     const isWorker = type === 'per_day_worker';
     container.innerHTML = `
         <div class="print-only">HR SYSTEM</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;" class="no-print">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <h1 style="margin: 0;">${isWorker ? 'Worker Payroll' : 'Employee Payroll'}</h1>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <select id="payroll-month" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${m == i + 1 ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'long' })}</option>`).join('')}
+        <div class="page-actions no-print">
+            <h1>${isWorker ? 'Worker Payroll' : 'Employee Payroll'}</h1>
+            <div class="action-buttons">
+                <div class="filter-row" style="margin:0;">
+                    <select id="payroll-month">
+                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${m == i + 1 ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'short' })}</option>`).join('')}
                     </select>
-                    <input type="number" id="payroll-year" value="${y}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="fetchPayrollHistory(document.getElementById('payroll-month').value, document.getElementById('payroll-year').value, '${type}')">Filter</button>
+                    <input type="number" id="payroll-year" value="${y}" style="width: 75px;">
+                    <button class="btn" onclick="fetchPayrollHistory(document.getElementById('payroll-month').value, document.getElementById('payroll-year').value, '${type}')">Filter</button>
                 </div>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="window.print()">Print List</button>
-                <button class="btn" style="width: auto; padding: 0.5rem 1.5rem;" onclick="showPayrollModal('${type}')">Calculate Salary</button>
+                <button class="btn" style="background: #6c757d;" onclick="window.print()">🖨 Print</button>
+                <button class="btn" onclick="showPayrollModal('${type}')">+ Calculate</button>
             </div>
         </div>
         <div class="content-card">
-            <table>
-                <thead>
-                    <tr>
-                        <th>${isWorker ? 'Worker' : 'Employee'}</th>
-                        <th>Month/Year</th>
-                        <th>${isWorker ? 'Total Base wage' : 'Basic Salary'}</th>
-                        <th>Absence</th>
-                        <th>Overtime</th>
-                        <th>Advances</th>
-                        <th>Deduction</th>
-                        <th>Net Salary</th>
-                        <th>Generated On</th>
-                        <th class="no-print">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="payroll-table-body">
-                    <tr><td colspan="10" style="text-align:center;">No records found.</td></tr>
-                </tbody>
-                <tfoot id="payroll-table-footer"></tfoot>
-            </table>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>${isWorker ? 'Worker' : 'Employee'}</th>
+                            <th>Month/Year</th>
+                            <th>${isWorker ? 'Base Wage' : 'Basic Salary'}</th>
+                            <th>Absence</th>
+                            <th>Overtime</th>
+                            <th>Advances</th>
+                            <th>Deduction</th>
+                            <th>Net Salary</th>
+                            <th>Date</th>
+                            <th class="no-print">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payroll-table-body">
+                        <tr><td colspan="10" style="text-align:center;">No records found.</td></tr>
+                    </tbody>
+                    <tfoot id="payroll-table-footer"></tfoot>
+                </table>
+            </div>
         </div>
     `;
     fetchPayrollHistory(m, y, type);
@@ -913,33 +970,37 @@ const showPayrollModal = async (type = 'company_employee') => {
 
     const modal = document.createElement('div');
     modal.id = "payroll-modal";
-    modal.style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;";
+    modal.className = "modal-overlay";
     modal.innerHTML = `
-        <div class="content-card" style="width: 450px;">
+        <div class="modal-box">
             <h2>Calculate ${isWorker ? 'Worker' : 'Employee'} Payroll</h2>
             <div class="form-group">
                 <label>${isWorker ? 'Worker' : 'Employee'}</label>
-                <select id="pay-emp-id" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px;">
+                <select id="pay-emp-id" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;">
                     ${employees.map(e => `<option value="${e.id}">${e.full_name} (${state.currency}${e.basic_salary}${e.employee_type === 'per_day_worker' ? '/Day' : ''})</option>`).join('')}
                 </select>
             </div>
-            <div style="display: flex; gap: 1rem;">
-                <div class="form-group" style="flex:1;">
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <div class="form-group" style="flex:1; min-width: 130px;">
                     <label>Month</label>
-                    <select id="pay-month" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px;">
+                    <select id="pay-month" style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px;">
                         ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${new Date().getMonth() === i ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'long' })}</option>`).join('')}
                     </select>
                 </div>
-                <div class="form-group" style="flex:1;"><label>Year</label><input type="number" id="pay-year" value="${new Date().getFullYear()}" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px;"></div>
+                <div class="form-group" style="flex:1; min-width: 100px;">
+                    <label>Year</label>
+                    <input type="number" id="pay-year" value="${new Date().getFullYear()}" style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px;">
+                </div>
             </div>
-            <div class="form-group"><label>Overtime Hours</label><input type="number" id="pay-ot" value="0"></div>
-            <div class="form-group"><label>Deductions (${state.currency})</label><input type="number" id="pay-deduct" value="0"></div>
-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button class="btn" onclick="handleCalculatePayroll('${type}')">Generate</button>
+            <div class="form-group"><label>Overtime Hours</label><input type="number" id="pay-ot" value="0" placeholder="0"></div>
+            <div class="form-group"><label>Deductions (${state.currency})</label><input type="number" id="pay-deduct" value="0" placeholder="0"></div>
+            <div class="modal-actions">
+                <button class="btn" onclick="handleCalculatePayroll('${type}')">Generate Payroll</button>
                 <button class="btn" style="background: #777;" onclick="closeModal('payroll-modal')">Cancel</button>
             </div>
         </div>
     `;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal('payroll-modal'); });
     document.body.appendChild(modal);
 };
 
@@ -1079,23 +1140,21 @@ const renderDetailedAttendanceReport = async (month, year, type = 'company_emplo
     }
 
     contentArea.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <h1 class="no-print" style="margin: 0;">${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
-                <div class="no-print" style="display: flex; gap: 0.5rem; align-items: center;">
-                    <select id="report-month" style="padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${m == i + 1 ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'long' })}</option>`).join('')}
+        <div class="page-actions no-print">
+            <h1 style="margin:0;">${isWorker ? 'Worker Attendance' : 'Employee Attendance'}</h1>
+            <div class="action-buttons">
+                <div class="filter-row" style="margin:0;">
+                    <select id="report-month">
+                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${m == i + 1 ? 'selected' : ''}>${new Date(0, i).toLocaleString('en', { month: 'short' })}</option>`).join('')}
                     </select>
-                    <input type="number" id="report-year" value="${y}" style="width: 80px; padding: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="renderDetailedAttendanceReport(document.getElementById('report-month').value, document.getElementById('report-year').value, '${type}')">View</button>
+                    <input type="number" id="report-year" value="${y}" style="width: 75px;">
+                    <button class="btn" onclick="renderDetailedAttendanceReport(document.getElementById('report-month').value, document.getElementById('report-year').value, '${type}')">View</button>
                 </div>
-            </div>
-            <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - ${isWorker ? 'Worker' : 'Employee'} Attendance Report (${m}/${y})</h1>
-            <div style="display: flex; gap: 0.5rem;" class="no-print">
-                <button class="btn" style="width: auto;" onclick="renderReports(document.getElementById('main-content-area'), '${type}')">Back</button>
-                <button class="btn" style="width: auto; background: #6c757d;" onclick="window.print()">Print Report</button>
+                <button class="btn" onclick="renderReports(document.getElementById('main-content-area'), '${type}')">← Back</button>
+                <button class="btn" style="background: #6c757d;" onclick="window.print()">🖨 Print</button>
             </div>
         </div>
+        <h1 class="print-only" style="display: none; text-align: center; width: 100%;">HR SYSTEM - ${isWorker ? 'Worker' : 'Employee'} Attendance Report (${m}/${y})</h1>
 
         <div class="content-card" style="overflow-x: auto;">
             <table class="report-table" style="font-size: 0.8rem;">
@@ -1247,6 +1306,9 @@ const closeModal = (id) => {
 window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
 window.navigateTo = navigateTo;
+window.navigateToMobile = navigateToMobile;
+window.toggleSidebar = toggleSidebar;
+window.closeSidebar = closeSidebar;
 window.saveEmployee = saveEmployee;
 window.showEmployeeModal = showEmployeeModal;
 window.deleteEmployee = deleteEmployee;
@@ -1265,6 +1327,7 @@ window.getStatusSelectStyle = getStatusSelectStyle;
 window.getLocalDateString = getLocalDateString;
 window.changeAttendanceDate = changeAttendanceDate;
 window.renderWorkers = renderWorkers;
+window.renderReports = renderReports;
 
 // Handle Enter key navigation in all forms/cards (Auth, Employee Modal, etc.)
 document.addEventListener('keydown', (e) => {
