@@ -4,8 +4,8 @@
     "description": "Root management for Attendance and Payroll System",
     "scripts": {
         "install-backend": "cd backend && npm install",
-        "dev": "concurrently \"npm run dev --prefix backend\" \"npx http-server frontend -p 3000\"",
-        "start": "concurrently \"npm start --prefix backend\" \"npx http-server frontend -p 3000\""
+        "dev": "concurrently \"npm run dev --prefix backend\" \"npx http-server frontend -p 3000 -c-1\"",
+        "start": "concurrently \"npm start --prefix backend\" \"npx http-server frontend -p 3000 -c-1\""
     },
     "devDependencies": {
         "concurrently": "^8.2.2"

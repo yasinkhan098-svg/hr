@@ -230,7 +230,7 @@ const handleLogout = () => {
 };
 
 const renderDashboardLayout = () => {
-    const orgName = state.admin ? state.admin.org_name : 'HR System';
+    const orgName = (state.admin && state.admin.org_name) ? state.admin.org_name : 'HR System';
     const userName = state.admin ? state.admin.username : 'Admin';
 
     app.innerHTML = `
